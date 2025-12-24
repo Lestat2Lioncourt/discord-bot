@@ -547,17 +547,25 @@ class CharteValidationView(View):
     @discord.ui.button(label="J'accepte", style=ButtonStyle.green)
     async def accept(self, interaction: Interaction, button: Button):
         if interaction.user != self.member:
+            await interaction.response.defer()
             return
         self.accepted = True
-        await interaction.response.edit_message(content="Clause acceptee !", view=None)
+        try:
+            await interaction.response.edit_message(content="Charte acceptee !", view=None)
+        except discord.errors.InteractionResponded:
+            pass
         self.stop()
 
     @discord.ui.button(label="Je refuse", style=ButtonStyle.red)
     async def refuse(self, interaction: Interaction, button: Button):
         if interaction.user != self.member:
+            await interaction.response.defer()
             return
         self.accepted = False
-        await interaction.response.edit_message(content="Clause refusee.", view=None)
+        try:
+            await interaction.response.edit_message(content="Charte refusee.", view=None)
+        except discord.errors.InteractionResponded:
+            pass
         self.stop()
 
 
@@ -572,17 +580,25 @@ class YesNoView(View):
     @discord.ui.button(label="Oui", style=ButtonStyle.green)
     async def yes(self, interaction: Interaction, button: Button):
         if interaction.user != self.member:
+            await interaction.response.defer()
             return
         self.answer = True
-        await interaction.response.edit_message(view=None)
+        try:
+            await interaction.response.edit_message(view=None)
+        except discord.errors.InteractionResponded:
+            pass
         self.stop()
 
     @discord.ui.button(label="Non", style=ButtonStyle.secondary)
     async def no(self, interaction: Interaction, button: Button):
         if interaction.user != self.member:
+            await interaction.response.defer()
             return
         self.answer = False
-        await interaction.response.edit_message(view=None)
+        try:
+            await interaction.response.edit_message(view=None)
+        except discord.errors.InteractionResponded:
+            pass
         self.stop()
 
 
@@ -596,8 +612,12 @@ class NextButtonView(View):
     @discord.ui.button(label="Suivant", style=ButtonStyle.primary, emoji="➡️")
     async def next(self, interaction: Interaction, button: Button):
         if interaction.user != self.member:
+            await interaction.response.defer()
             return
-        await interaction.response.edit_message(content="─" * 30, view=None)
+        try:
+            await interaction.response.edit_message(content="─" * 30, view=None)
+        except discord.errors.InteractionResponded:
+            pass
         self.stop()
 
 
