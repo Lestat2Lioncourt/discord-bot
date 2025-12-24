@@ -149,77 +149,63 @@ class RegistrationCog(commands.Cog):
         await self.ask_players_for_team(member, dm_channel, 1, "This Is PSG")
 
     async def ask_players_for_team(self, member: discord.Member, dm_channel: discord.DMChannel,
-                                    team_id: int, team_name: str):
+                                    team_id: int, team_name: str, is_main_team: bool = True):
         """Demande les joueurs pour une equipe."""
         username = member.name
 
-        view = YesNoView(member)
-        await dm_channel.send(
-            f"**As-tu des joueurs dans {team_name} ?**",
-            view=view
-        )
+        # Message selon l'equipe
+        if is_main_team:
+            prompt = f"**Ajouter un joueur dans {team_name}** (equipe principale)\n"
+        else:
+            prompt = f"**Ajouter un joueur dans {team_name}**\n"
 
-        try:
-            await asyncio.wait_for(view.wait(), timeout=300)
-        except asyncio.TimeoutError:
-            await dm_channel.send("Temps ecoule. Tape `!inscription` pour recommencer.")
-            self.active_registrations.pop(username, None)
-            return
+        prompt += "Saisis le nom du joueur, ou `.` si aucun :"
 
-        if view.answer:
-            # Saisie des joueurs
-            await dm_channel.send(
-                f"Saisis les noms de tes joueurs dans **{team_name}** (un par message).\n"
-                f"Envoie un message **vide** ou tape **stop** quand tu as termine."
-            )
+        await dm_channel.send(prompt)
 
-            players_added = []
-            while True:
-                def check(m):
-                    return m.author == member and isinstance(m.channel, discord.DMChannel)
+        players_added = []
+        while True:
+            def check(m):
+                return m.author == member and isinstance(m.channel, discord.DMChannel)
 
-                try:
-                    msg = await self.bot.wait_for("message", check=check, timeout=120)
-                    player_name = msg.content.strip()
+            try:
+                msg = await self.bot.wait_for("message", check=check, timeout=120)
+                player_name = msg.content.strip()
 
-                    # Fin de saisie
-                    if not player_name or player_name.lower() == "stop":
-                        break
-
-                    # Validation basique
-                    if len(player_name) < 2:
-                        await dm_channel.send("Nom trop court, reessaie.")
-                        continue
-                    if len(player_name) > 50:
-                        await dm_channel.send("Nom trop long, reessaie.")
-                        continue
-
-                    # Enregistrer le joueur
-                    try:
-                        await Player.create(self.bot.db_pool, username, player_name, team_id)
-                        players_added.append(player_name)
-                        await dm_channel.send(f"Joueur **{player_name}** ajoute !")
-                    except Exception as e:
-                        logger.error(f"Erreur creation joueur: {e}")
-                        await dm_channel.send(f"Erreur lors de l'ajout de {player_name}.")
-
-                except asyncio.TimeoutError:
-                    await dm_channel.send("Temps ecoule, on continue...")
+                # Fin de saisie
+                if player_name == "." or player_name.lower() == "stop" or not player_name:
                     break
 
-            if players_added:
-                await dm_channel.send(
-                    f"Tu as ajoute {len(players_added)} joueur(s) dans {team_name}."
-                )
-            else:
-                await dm_channel.send(f"Aucun joueur ajoute dans {team_name}.")
+                # Validation basique
+                if len(player_name) < 2:
+                    await dm_channel.send("Nom trop court, reessaie :")
+                    continue
+                if len(player_name) > 50:
+                    await dm_channel.send("Nom trop long, reessaie :")
+                    continue
 
-        await asyncio.sleep(1)
+                # Enregistrer le joueur
+                try:
+                    await Player.create(self.bot.db_pool, username, player_name, team_id)
+                    players_added.append(player_name)
+                    await dm_channel.send(f"Joueur **{player_name}** ajoute ! (`.` pour terminer, ou autre nom) :")
+                except Exception as e:
+                    logger.error(f"Erreur creation joueur: {e}")
+                    await dm_channel.send(f"Erreur lors de l'ajout. Reessaie :")
+
+            except asyncio.TimeoutError:
+                await dm_channel.send("Temps ecoule, on continue...")
+                break
+
+        if players_added:
+            await dm_channel.send(f"{len(players_added)} joueur(s) ajoute(s) dans {team_name}.")
+
+        await asyncio.sleep(0.5)
 
         # Passer a l'equipe suivante ou a la localisation
         if team_id == 1:
             self.active_registrations[username] = "team2"
-            await self.ask_players_for_team(member, dm_channel, 2, "This Is PSG 2")
+            await self.ask_players_for_team(member, dm_channel, 2, "This Is PSG 2", is_main_team=False)
         else:
             self.active_registrations[username] = "localisation"
             await self.ask_location(member, dm_channel)
@@ -386,36 +372,103 @@ class RegistrationCog(commands.Cog):
 
         await ctx.send(embed=embed)
 
-    @commands.command(name="joueur")
-    async def cmd_joueur(self, ctx, *, player_info: str = None):
-        """Ajoute un joueur. Usage: !joueur NomJoueur [equipe]"""
-        if not player_info:
-            await ctx.send(
-                "**Usage:** `!joueur NomJoueur [equipe]`\n"
-                "**Exemples:**\n"
-                "- `!joueur MonPseudo` (equipe par defaut: This Is PSG)\n"
-                "- `!joueur MonPseudo 2` (pour This Is PSG 2)"
-            )
-            return
-
-        # Parser l'argument
-        parts = player_info.rsplit(" ", 1)
-        if len(parts) == 2 and parts[1] in ("1", "2"):
-            player_name = parts[0]
-            team_id = int(parts[1])
-        else:
-            player_name = player_info
-            team_id = 1  # Par defaut
-
+    @commands.command(name="joueur", aliases=["player", "joueurs", "players"])
+    async def cmd_joueur(self, ctx):
+        """Affiche les joueurs et permet d'en ajouter."""
         username = ctx.author.name
+        member = ctx.author
 
+        # Afficher les joueurs existants
+        players = await Player.get_by_member(self.bot.db_pool, username)
+
+        if players:
+            team1 = [p.player_name for p in players if p.team_name == "This Is PSG"]
+            team2 = [p.player_name for p in players if p.team_name == "This Is PSG 2"]
+
+            msg = "**Tes joueurs actuels :**\n"
+            if team1:
+                msg += f"This Is PSG : {', '.join(team1)}\n"
+            if team2:
+                msg += f"This Is PSG 2 : {', '.join(team2)}\n"
+            await ctx.send(msg)
+        else:
+            await ctx.send("Tu n'as aucun joueur enregistre.")
+
+        await ctx.send("Je t'envoie le formulaire d'ajout en message prive...")
+
+        # Demarrer la saisie en DM
         try:
-            await Player.create(self.bot.db_pool, username, player_name, team_id)
-            team_name = "This Is PSG" if team_id == 1 else "This Is PSG 2"
-            await ctx.send(f"Joueur **{player_name}** ajoute dans **{team_name}** !")
-        except Exception as e:
-            logger.error(f"Erreur ajout joueur: {e}")
-            await ctx.send("Erreur lors de l'ajout du joueur.")
+            dm_channel = await member.create_dm()
+            await self.start_player_registration(member, dm_channel)
+        except discord.Forbidden:
+            await ctx.send("Je ne peux pas t'envoyer de message prive. Verifie tes parametres.")
+
+    async def start_player_registration(self, member: discord.Member, dm_channel: discord.DMChannel):
+        """Demarre uniquement la saisie des joueurs (sans charte)."""
+        username = member.name
+
+        await dm_channel.send("**Ajout de joueurs**\n")
+        await asyncio.sleep(0.5)
+
+        # Team 1
+        await self.ask_players_for_team_only(member, dm_channel, 1, "This Is PSG", is_main_team=True)
+
+        # Team 2
+        await self.ask_players_for_team_only(member, dm_channel, 2, "This Is PSG 2", is_main_team=False)
+
+        # Resume
+        players = await Player.get_by_member(self.bot.db_pool, username)
+        if players:
+            msg = "**Tes joueurs :**\n"
+            for p in players:
+                msg += f"- {p.player_name} ({p.team_name})\n"
+            await dm_channel.send(msg)
+        else:
+            await dm_channel.send("Aucun joueur enregistre.")
+
+    async def ask_players_for_team_only(self, member: discord.Member, dm_channel: discord.DMChannel,
+                                         team_id: int, team_name: str, is_main_team: bool = True):
+        """Saisie des joueurs pour une equipe (version standalone)."""
+        username = member.name
+
+        if is_main_team:
+            prompt = f"**Ajouter un joueur dans {team_name}** (equipe principale)\n"
+        else:
+            prompt = f"**Ajouter un joueur dans {team_name}**\n"
+
+        prompt += "Saisis le nom du joueur, ou `.` si aucun :"
+        await dm_channel.send(prompt)
+
+        while True:
+            def check(m):
+                return m.author == member and isinstance(m.channel, discord.DMChannel)
+
+            try:
+                msg = await self.bot.wait_for("message", check=check, timeout=120)
+                player_name = msg.content.strip()
+
+                if player_name == "." or player_name.lower() == "stop" or not player_name:
+                    break
+
+                if len(player_name) < 2:
+                    await dm_channel.send("Nom trop court, reessaie :")
+                    continue
+                if len(player_name) > 50:
+                    await dm_channel.send("Nom trop long, reessaie :")
+                    continue
+
+                try:
+                    await Player.create(self.bot.db_pool, username, player_name, team_id)
+                    await dm_channel.send(f"Joueur **{player_name}** ajoute ! (`.` pour terminer, ou autre nom) :")
+                except Exception as e:
+                    logger.error(f"Erreur creation joueur: {e}")
+                    await dm_channel.send(f"Erreur. Reessaie :")
+
+            except asyncio.TimeoutError:
+                await dm_channel.send("Temps ecoule.")
+                break
+
+        await asyncio.sleep(0.3)
 
     @commands.command(name="localisation")
     async def cmd_localisation(self, ctx, *, location: str = None):
