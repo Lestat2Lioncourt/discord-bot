@@ -74,3 +74,10 @@ CHARTE_TEXTS = {
 # Configuration du Bot
 # =============================================================================
 BOT_PREFIX = "!"
+
+# =============================================================================
+# Mode Debug
+# =============================================================================
+# En mode debug, seul DEBUG_USER peut utiliser les commandes
+DEBUG_MODE = os.getenv("DEBUG_MODE", "false").lower() == "true"
+DEBUG_USER = os.getenv("DEBUG_USER", "detrax75")

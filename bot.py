@@ -16,6 +16,7 @@ from config import (
 from utils.database import Database
 from utils.logger import get_logger
 from utils.validators import validate_user_id, validate_username
+from utils.debug import debug_only, is_debug_mode
 
 # ===============================================================================
 # Initialisations
@@ -91,6 +92,7 @@ async def connect_to_db():
 # Commande test pour interagir avec la base de données
 # ===============================================================================
 @bot.command()
+@debug_only()
 async def add_user(ctx, user_id: int, user_name: str):
     """Ajoute un utilisateur dans la base de données."""
     # Validation des inputs
@@ -202,6 +204,8 @@ if __name__ == "__main__":
                 bot.db_pool = db_pool
                 await load_cogs()
                 await initialize_bot()
+                if is_debug_mode():
+                    logger.warning("=== MODE DEBUG ACTIVÉ ===")
                 logger.info("Démarrage du bot...")
                 await bot.start(TOKEN)
             except KeyboardInterrupt:
