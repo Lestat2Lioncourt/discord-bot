@@ -44,10 +44,17 @@ class EventsCog(commands.Cog):
         if accueil_channel:
             await accueil_channel.send(
                 f"Bienvenue {member.mention} sur **{member.guild.name}** !\n\n"
-                f"Pour commencer ton inscription, tape `!inscription` ici."
+                f"Je t'envoie les instructions d'inscription en message prive..."
             )
         else:
             logger.warning(f"Canal accueil (ID: {CHANNEL_ACCUEIL_ID}) introuvable")
+
+        # Demarrer automatiquement l'inscription en DM
+        registration_cog = self.bot.get_cog("RegistrationCog")
+        if registration_cog:
+            await registration_cog.start_registration(member)
+        else:
+            logger.warning("RegistrationCog non trouve")
 
     @commands.Cog.listener()
     async def on_presence_update(self, before, after):
