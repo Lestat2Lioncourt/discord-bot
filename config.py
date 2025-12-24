@@ -81,3 +81,15 @@ BOT_PREFIX = "!"
 # En mode debug, seul DEBUG_USER peut utiliser les commandes
 DEBUG_MODE = os.getenv("DEBUG_MODE", "false").lower() == "true"
 DEBUG_USER = os.getenv("DEBUG_USER", "detrax75")
+
+# =============================================================================
+# Discord Role IDs
+# =============================================================================
+ROLE_NEWBIE_ID = int(os.getenv("ROLE_NEWBIE_ID", "0"))
+ROLE_MEMBRE_ID = int(os.getenv("ROLE_MEMBRE_ID", "0"))
+ROLE_SAGE_ID = int(os.getenv("ROLE_SAGE_ID", "0"))
+
+# =============================================================================
+# Discord Channel IDs
+# =============================================================================
+CHANNEL_ACCUEIL_ID = int(os.getenv("CHANNEL_ACCUEIL_ID", "0"))

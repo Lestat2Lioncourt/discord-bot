@@ -43,18 +43,19 @@ Un membre Discord peut avoir plusieurs joueurs (un par équipe).
 - [x] Créer script de migration `scripts/run_migration.py`
 - [x] Ajouter dépendance `geopy` pour géocodage
 
-### Phase 2 : Gestion des rôles Discord
+### Phase 2 : Gestion des rôles Discord ✅ TERMINÉE
 
-- [ ] Définir les IDs des rôles dans `.env` :
-  - `ROLE_NOUVEAU_ID`
-  - `ROLE_MEMBRE_ID`
-  - `ROLE_SAGE_ID`
-- [ ] Créer `utils/roles.py` avec fonctions :
-  - `assign_role_nouveau(member)`
+- [x] Définir les IDs des rôles dans `.env` :
+  - `ROLE_NEWBIE_ID=1453322362484297870`
+  - `ROLE_MEMBRE_ID=1453322702571049072`
+  - `ROLE_SAGE_ID=1322971425434501161`
+  - `CHANNEL_ACCUEIL_ID=1453323021497405451`
+- [x] Créer `utils/roles.py` avec fonctions :
+  - `assign_newbie_role(member)`
   - `promote_to_membre(member)`
-  - `is_sage(member)`
-- [ ] Event `on_member_join` : attribuer @Nouveau automatiquement
-- [ ] Lors de validation par sage : remplacer @Nouveau par @Membre
+  - `is_sage(member)`, `is_membre(member)`, `is_newbie(member)`
+- [x] Event `on_member_join` : attribuer @Newbie automatiquement
+- [x] Lors de validation par sage : remplacer @Newbie par @Membre
 
 ### Phase 3 : Commandes nouveaux inscrits
 
