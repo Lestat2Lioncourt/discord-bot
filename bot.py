@@ -41,8 +41,14 @@ logging.getLogger("discord").setLevel(logging.WARNING)
 
 # -------------------------------------------------------------------------------
 # Configure le caractère préfixe et désactiver la commande `help` native
+# strip_after_prefix=True permet d'ignorer les espaces après "!" (utile sur mobile)
 # -------------------------------------------------------------------------------
-bot = commands.Bot(command_prefix=BOT_PREFIX, intents=intents, help_command=None)
+bot = commands.Bot(
+    command_prefix=BOT_PREFIX,
+    intents=intents,
+    help_command=None,
+    strip_after_prefix=True
+)
 
 # -------------------------------------------------------------------------------
 # Connecteur à la base de données
