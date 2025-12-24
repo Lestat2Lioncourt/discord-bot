@@ -4,14 +4,24 @@ from discord.ext import commands
 import asyncio
 import asyncpg
 import logging
-from security.credentials import DISCORD_TOKEN, DB_DISCORD
-import os
-from utils.database import Database  # Importer le module de base de données
+from pathlib import Path
+
+from config import (
+    DISCORD_TOKEN,
+    DB_CONFIG,
+    CHARTE_JSON_PATH,
+    BOT_PREFIX,
+    BASE_DIR,
+)
+from utils.database import Database
+from utils.logger import get_logger
+from utils.validators import validate_user_id, validate_username
 
 # ===============================================================================
 # Initialisations
 # ===============================================================================
 TOKEN = DISCORD_TOKEN
+logger = get_logger("main")
 
 # -------------------------------------------------------------------------------
 # Intents - Sélection des fonctionnalités du bot actives
@@ -28,12 +38,11 @@ intents.presences = True
 # d'information
 # -------------------------------------------------------------------------------
 logging.getLogger("discord").setLevel(logging.WARNING)
-logging.basicConfig(level=logging.INFO)
 
 # -------------------------------------------------------------------------------
 # Configure le caractère préfixe et désactiver la commande `help` native
 # -------------------------------------------------------------------------------
-bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
+bot = commands.Bot(command_prefix=BOT_PREFIX, intents=intents, help_command=None)
 
 # -------------------------------------------------------------------------------
 # Connecteur à la base de données
@@ -45,38 +54,32 @@ db_pool = None
 # ===============================================================================
 async def load_cogs():
     """Charge dynamiquement les cogs dans le dossier cogs."""
-    cogs_dir = "cogs"
-    if not os.path.exists(cogs_dir):
-        print(f"Le dossier {cogs_dir} n'existe pas. Aucun cog n'a été chargé.")
+    cogs_dir = BASE_DIR / "cogs"
+    if not cogs_dir.exists():
+        logger.error(f"Le dossier {cogs_dir} n'existe pas. Aucun cog n'a été chargé.")
         return
 
-    for filename in os.listdir(cogs_dir):
-        if filename.endswith(".py"):
-            cog_name = filename[:-3]  # Retirer l'extension .py
-            try:
-                await bot.load_extension(f"cogs.{cog_name}")
-                print(f"✅ {cog_name} chargé avec succès.")
-            except commands.ExtensionAlreadyLoaded:
-                print(f"⚠️ {cog_name} était déjà chargé.")
-            except commands.ExtensionNotFound:
-                print(f"❌ {cog_name} introuvable.")
-            except commands.NoEntryPointError:
-                print(f"❌ {cog_name} ne contient pas de fonction `setup()`.")
-            except commands.ExtensionFailed as e:
-                print(f"❌ Échec du chargement de {cog_name}: {e}")
+    for filepath in cogs_dir.glob("*.py"):
+        cog_name = filepath.stem  # Nom du fichier sans extension
+        try:
+            await bot.load_extension(f"cogs.{cog_name}")
+            logger.info(f"Cog '{cog_name}' chargé avec succès")
+        except commands.ExtensionAlreadyLoaded:
+            logger.warning(f"Cog '{cog_name}' était déjà chargé")
+        except commands.ExtensionNotFound:
+            logger.error(f"Cog '{cog_name}' introuvable")
+        except commands.NoEntryPointError:
+            logger.error(f"Cog '{cog_name}' ne contient pas de fonction setup()")
+        except commands.ExtensionFailed as e:
+            logger.error(f"Échec du chargement de '{cog_name}': {e}")
 
 # ===============================================================================
 # Fonction de connexion à PostgreSQL
 # ===============================================================================
 async def connect_to_db():
     global db_pool
-    db_pool = await asyncpg.create_pool(
-        host=DB_DISCORD["DB_HOST"],
-        database=DB_DISCORD["DB_NAME"],
-        user=DB_DISCORD["DB_USER"],
-        password=DB_DISCORD["DB_PASSWORD"],
-        port=DB_DISCORD["DB_PORT"])
-    print("✅ Base de données connectée.")
+    db_pool = await asyncpg.create_pool(**DB_CONFIG)
+    logger.info("Base de données PostgreSQL connectée")
 
 # ===============================================================================
 # Commande test pour interagir avec la base de données
@@ -84,12 +87,28 @@ async def connect_to_db():
 @bot.command()
 async def add_user(ctx, user_id: int, user_name: str):
     """Ajoute un utilisateur dans la base de données."""
-    async with db_pool.acquire() as connection:
-        await connection.execute(
-            "INSERT INTO users (id, name) VALUES ($1, $2)",
-            user_id, user_name
-        )
-    await ctx.send(f"Utilisateur {user_name} ajouté avec succès !")
+    # Validation des inputs
+    is_valid, error = validate_user_id(user_id)
+    if not is_valid:
+        await ctx.send(f"Erreur: {error}")
+        return
+
+    is_valid, error = validate_username(user_name)
+    if not is_valid:
+        await ctx.send(f"Erreur: {error}")
+        return
+
+    try:
+        async with db_pool.acquire() as connection:
+            await connection.execute(
+                "INSERT INTO users (id, name) VALUES ($1, $2)",
+                user_id, user_name
+            )
+        await ctx.send(f"Utilisateur {user_name} ajouté avec succès !")
+        logger.info(f"Utilisateur ajouté: {user_name} (ID: {user_id})")
+    except Exception as e:
+        logger.error(f"Erreur ajout utilisateur: {e}")
+        await ctx.send("Erreur lors de l'ajout de l'utilisateur.")
 
 # ===============================================================================
 # Commande `help` personnalisée
@@ -129,19 +148,18 @@ async def custom_help(ctx, command_name: str = None):
 # ===============================================================================
 async def initialize_bot():
     """Initialise le bot en remplissant la table Charte."""
-    from cogs.admin_commands import AdminCommandsCog  # Importer le cog des commandes d'administration
+    from cogs.admin_commands import AdminCommandsCog
     admin_cog = AdminCommandsCog(bot)
-    charte_path = "data/charte.json"
 
-    if not os.path.exists(charte_path):
-        print(f"❌ Le fichier `{charte_path}` n'existe pas.")
+    if not CHARTE_JSON_PATH.exists():
+        logger.error(f"Le fichier {CHARTE_JSON_PATH} n'existe pas")
         return
 
-    with open(charte_path, "r", encoding="utf-8") as f:
+    with open(CHARTE_JSON_PATH, "r", encoding="utf-8") as f:
         charte_data = json.load(f)
 
     await admin_cog.db.set_charte(charte_data)
-    print("✅ La table `Charte` a été mise à jour avec succès.")
+    logger.info("Table Charte mise à jour avec succès")
 
 # ===============================================================================
 # Démarrage du bot avec reconnexion automatique en cas de plantage
@@ -149,14 +167,13 @@ async def initialize_bot():
 async def run_bot():
     while True:
         try:
-            # Connexion à la base de données avant de démarrer le bot
             await connect_to_db()
-            bot.db_pool = db_pool  # Attache db_pool à l'objet bot
+            bot.db_pool = db_pool
             await load_cogs()
-            await initialize_bot()  # Appeler la fonction d'initialisation
+            await initialize_bot()
             await bot.start(TOKEN)
         except discord.ConnectionClosed:
-            print("Connexion perdue. Reconnexion dans 5 secondes...")
+            logger.warning("Connexion perdue. Reconnexion dans 5 secondes...")
             await asyncio.sleep(5)
 
 @bot.event
@@ -165,7 +182,7 @@ async def on_close():
     global db_pool
     if db_pool:
         await db_pool.close()
-        print("✅ Connexion PostgreSQL fermée proprement.")
+        logger.info("Connexion PostgreSQL fermée proprement")
 
 # ===============================================================================
 # Démarrage du bot
@@ -175,33 +192,26 @@ if __name__ == "__main__":
         global db_pool
         async with bot:
             try:
-                # Connexion à la base de données
                 await connect_to_db()
-                bot.db_pool = db_pool  # Attache db_pool à l'objet bot
-
-                # Chargement des cogs
+                bot.db_pool = db_pool
                 await load_cogs()
-
-                # Initialisation du bot
                 await initialize_bot()
-
-                # Démarrer le bot
+                logger.info("Démarrage du bot...")
                 await bot.start(TOKEN)
             except KeyboardInterrupt:
-                print("🛑 Bot arrêté par l'utilisateur.")
+                logger.info("Bot arrêté par l'utilisateur")
             finally:
-                # Fermeture propre des connexions
-                print("🔄 Fermeture propre du bot...")
+                logger.info("Fermeture propre du bot...")
                 await bot.close()
                 if db_pool:
                     await db_pool.close()
-                print("✅ Connexions fermées.")
+                logger.info("Connexions fermées")
 
     try:
         loop = asyncio.get_event_loop()
         loop.run_until_complete(main())
     except Exception as e:
-        print(f"❌ Erreur critique : {e}")
+        logger.critical(f"Erreur critique: {e}")
     finally:
-        loop.run_until_complete(asyncio.sleep(1))  # Laisser le temps aux connexions de se fermer
+        loop.run_until_complete(asyncio.sleep(1))
         loop.close()

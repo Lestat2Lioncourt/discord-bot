@@ -1,6 +1,7 @@
 [project]
 name = "discord-bot"
-version = "0.1.0"
+version = "0.2.0"
+description = "Bot Discord pour la team This is PSG"
 requires-python = ">=3.11"
 dependencies = [
     "aiohappyeyeballs==2.4.4",
@@ -21,5 +22,6 @@ dependencies = [
     "pycparser==2.22",
     "pynacl==1.5.0",
     "pytesseract==0.3.13",
+    "python-dotenv==1.0.1",
     "yarl==1.18.3",
 ]

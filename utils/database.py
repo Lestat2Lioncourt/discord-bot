@@ -1,5 +1,15 @@
 import asyncpg
 import json
+import sys
+from pathlib import Path
+
+# Ajouter le dossier parent au path pour importer config
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from config import CHARTE_JSON_PATH
+from utils.logger import get_logger
+
+logger = get_logger("utils.database")
+
 
 class Database:
     def __init__(self, db_pool):
@@ -38,7 +48,7 @@ class Database:
         """
         async with self.db_pool.acquire() as connection:
             rows = await connection.fetch(query, username)
-            print(f"Données récupérées pour {username}: {rows}")  # Log de débogage
+            logger.debug(f"Validations récupérées pour {username}: {len(rows)} lignes")
             return [(row["id_clause"], row["validation"]) for row in rows]
 
     async def is_fully_validated(self, username: str, total_clauses: int):
@@ -73,8 +83,8 @@ class Database:
             return await connection.fetchval(query)
 
     async def set_charte(self, charte_data: dict):
-        print("Lancement de set_charte")
         """Remplit la table Charte en fonction du fichier charte.json."""
+        logger.debug("Lancement de set_charte")
         query = """
         INSERT INTO Charte (ID_Clause, Clause)
         VALUES ($1, $2)
@@ -83,9 +93,8 @@ class Database:
         async with self.db_pool.acquire() as connection:
             for clause in charte_data["charte"]:
                 if clause["validation"] == 1:
-                    print(f"Insertion de la clause: {clause['idx']}, {clause['name']}")
                     await connection.execute(query, clause["idx"], clause["name"])
-                    print(f"Clause ajoutée ou mise à jour: {clause['idx']}, {clause['name']}")
+                    logger.debug(f"Clause {clause['idx']} insérée: {clause['name']}")
 
     async def get_clause_by_name(self, clause_name: str):
         """Récupère l'ID d'une clause par son nom."""
@@ -96,10 +105,10 @@ class Database:
         """
         async with self.db_pool.acquire() as connection:
             clause_id = await connection.fetchval(query, clause_name)
-            print(f"ID de la clause récupéré pour le nom {clause_name}: {clause_id}")
+            logger.debug(f"Clause ID récupéré pour '{clause_name}': {clause_id}")
             return clause_id
 
     async def get_charte_data(self):
         """Récupère les données de charte.json."""
-        with open("data/charte.json", "r", encoding="utf-8") as f:
+        with open(CHARTE_JSON_PATH, "r", encoding="utf-8") as f:
             return json.load(f)["charte"]

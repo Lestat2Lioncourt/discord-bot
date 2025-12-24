@@ -1,10 +1,13 @@
 #!/bin/bash
+# =============================================================================
+# Arrête le bot Discord
+# =============================================================================
 
-# Vérifie si la session existe avant de la tuer
-if tmux has-session -t bot_session 2>/dev/null; then
-    tmux kill-session -t bot_session
-    echo "Bot arrêté et session tmux 'bot_session' terminée."
+SESSION_NAME="bot_session"
+
+if tmux has-session -t $SESSION_NAME 2>/dev/null; then
+    tmux kill-session -t $SESSION_NAME
+    echo "Bot arrêté et session '$SESSION_NAME' terminée"
 else
-    echo "Pas de session de bot active"
+    echo "Aucune session de bot active"
 fi
-

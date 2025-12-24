@@ -3,10 +3,14 @@ import discord
 from discord.ext import commands
 from discord import ButtonStyle, Interaction
 from discord.ui import Button, View
+from datetime import datetime
+
 from models.user_profile import UserProfile
-from utils.database import Database  # Importer le module dédié pour les interactions avec la base de données
-from datetime import datetime  # Importer le module datetime pour obtenir la date et l'heure actuelles
-import os
+from utils.database import Database
+from utils.logger import get_logger
+from config import CHARTE_TEXTS, DATA_DIR
+
+logger = get_logger("cogs.events")
 
 class EventsCog(commands.Cog):
     """Cog pour gérer les événements du bot."""
@@ -20,7 +24,7 @@ class EventsCog(commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         """Événement déclenché lorsque le bot est prêt."""
-        print(f"**{self.bot.user} est connecté et prêt à discuter.**")
+        logger.info(f"{self.bot.user} est connecté et prêt")
 
     @commands.Cog.listener()
     async def on_member_join(self, member):
@@ -33,12 +37,11 @@ class EventsCog(commands.Cog):
     @commands.Cog.listener()
     async def on_presence_update(self, before, after):
         """Événement déclenché lorsqu'un utilisateur change de statut."""
-        print(f"🔔 Événement on_presence_update déclenché pour {after.name}")
-        print(f"Statut avant: {before.status}, Statut après: {after.status}")
+        logger.debug(f"Presence update: {after.name} ({before.status} -> {after.status})")
 
         # Mettre à jour le champ last_connection lors de la connexion
         if before.status != after.status and after.status in (discord.Status.online, discord.Status.idle):
-            print(f"🔔 Utilisateur connecté : Username = {after.name}, Pseudo = {after.display_name}")
+            logger.info(f"Utilisateur connecté: {after.name} ({after.display_name})")
 
             # Vérifier et mettre à jour discord_name et last_connection si nécessaire
             async with self.bot.db_pool.acquire() as db_connection:
@@ -46,38 +49,36 @@ class EventsCog(commands.Cog):
                 user_profile.last_connection = datetime.now()
                 await user_profile.save()
                 self.active_profiles[after.name] = user_profile
-                print(f"✅ Profil chargé pour {after.display_name} [{after.name}] avec last_connection mis à jour")
+                logger.debug(f"Profil chargé pour {after.display_name} [{after.name}]")
 
             # Vérifier si l'utilisateur a validé la charte
             total_clauses = await self.db.get_total_clauses()
-            print(f"Total clauses: {total_clauses}")
             user_validations = await self.db.get_user_validations(after.name)
-            print(f"Validations de {after.name}: {user_validations}")
+            logger.debug(f"Validations de {after.name}: {len(user_validations)}/{total_clauses}")
             if not await self.db.is_fully_validated(after.name, total_clauses):
-                print(f"Lancement de la validation de la charte pour {after.name}")
+                logger.info(f"Lancement validation charte pour {after.name}")
                 await self.start_charte_validation(after)
 
         # Mettre à jour le champ last_connection lors de la déconnexion
         elif before.status in (discord.Status.online, discord.Status.idle) and after.status == discord.Status.offline:
-            print(f"🔔 Utilisateur déconnecté : Username = {after.name}, Pseudo = {after.display_name}")
+            logger.info(f"Utilisateur déconnecté: {after.name} ({after.display_name})")
 
             # Vérifier et mettre à jour last_connection si nécessaire
             async with self.bot.db_pool.acquire() as db_connection:
                 user_profile = await UserProfile.get_or_create_user(after.name, db_connection, after)
                 user_profile.last_connection = datetime.now()
                 await user_profile.save()
-                print(f"✅ Profil mis à jour pour {after.display_name} [{after.name}] avec last_connection")
+                logger.debug(f"Profil mis à jour pour {after.display_name}")
 
     async def start_charte_validation(self, member):
         """Démarre le processus de validation de la charte dans le chat personnel de l'utilisateur."""
-        print(f"Démarrage de la validation de la charte pour {member.name}")
+        logger.debug(f"Démarrage validation charte pour {member.name}")
         username = str(member.name)
         dm_channel = await member.create_dm()
 
         if not self.welcome_sent:
             # Afficher la clause 0a
-            clause_0a_path = "data/texts/charte_0a_intro.txt"
-            with open(clause_0a_path, "r", encoding="utf-8") as f:
+            with open(CHARTE_TEXTS["0a_intro"], "r", encoding="utf-8") as f:
                 clause_0a_text = f.read()
             await dm_channel.send(f"{clause_0a_text}")
             self.welcome_sent = True  # Marquer le message de bienvenue comme envoyé
@@ -89,8 +90,7 @@ class EventsCog(commands.Cog):
 
         if len(validated_clause_ids) < total_clauses:
             # Afficher la clause 0b
-            clause_0b_path = "data/texts/charte_0b_intro.txt"
-            with open(clause_0b_path, "r", encoding="utf-8") as f:
+            with open(CHARTE_TEXTS["0b_intro"], "r", encoding="utf-8") as f:
                 clause_0b_text = f.read()
             await dm_channel.send(f"{clause_0b_text}")
 
@@ -102,7 +102,7 @@ class EventsCog(commands.Cog):
             charte_data = await self.db.get_charte_data()
             for clause in charte_data:
                 if clause["idx"] not in validated_clause_ids and clause["validation"] == 1:
-                    clause_path = clause["path"]
+                    clause_path = DATA_DIR / clause["path"].replace("data/", "")
                     with open(clause_path, "r", encoding="utf-8") as f:
                         clause_text = f.read()
 
@@ -137,7 +137,7 @@ class EventsCog(commands.Cog):
     @commands.Cog.listener()
     async def on_member_update(self, before, after):
         """Événement déclenché lorsqu'un utilisateur est mis à jour."""
-        print(f"🔔Changement détecté : {before.status} → {after.status}")
+        logger.debug(f"Member update: {before.status} -> {after.status}")
         # Si l'utilisateur vient de passer en ligne
         if before.status != discord.Status.online and after.status in (discord.Status.online, discord.Status.idle):
             username = str(after.name)  # Récupère le nom d'utilisateur

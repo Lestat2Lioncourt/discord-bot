@@ -1,54 +1,28 @@
 import discord
 from discord.ext import commands
 from utils.image_processing import process_image
+from utils.logger import get_logger
+from utils.database import Database
+from utils.validators import validate_pseudo, validate_image_attachment
 import json
-import os
 import asyncio
 from datetime import datetime
+
+from config import CHARTE_JSON_PATH, DATA_DIR, TEMP_DIR
+
+logger = get_logger("cogs.user_commands")
+
 
 class UserCommandsCog(commands.Cog):
     """Commandes accessibles à tous les utilisateurs."""
 
     def __init__(self, bot):
         self.bot = bot
-        self.charte_path = "data/charte.json"
-        self.validation_path = "data/validation_charte.json"
+        self.db = Database(bot.db_pool)
 
-        # Charger la charte
-        with open(self.charte_path, "r", encoding="utf-8") as f:
+        # Charger la structure de la charte (pour les chemins des fichiers)
+        with open(CHARTE_JSON_PATH, "r", encoding="utf-8") as f:
             self.charte = json.load(f)
-
-        # Charger les validations
-        if os.path.exists(self.validation_path):
-            with open(self.validation_path, "r", encoding="utf-8") as f:
-                self.validations = json.load(f)
-        else:
-            self.validations = {}
-
-    def save_validations(self):
-        with open(self.validation_path, "w", encoding="utf-8") as f:
-            json.dump(self.validations, f, indent=4, ensure_ascii=False)
-
-    def get_user_validations(self, username):
-        return self.validations.get(username, [])
-
-    def add_validation(self, username, clause_idx):
-        if username not in self.validations:
-            self.validations[username] = []
-        if clause_idx not in self.validations[username]:
-            self.validations[username].append(clause_idx)
-        self.save_validations()
-
-    def remove_validation(self, username, clause_idx):
-        if username in self.validations and clause_idx in self.validations[username]:
-            self.validations[username].remove(clause_idx)
-            if not self.validations[username]:
-                del self.validations[username]
-            self.save_validations()
-
-    def is_fully_validated(self, username):
-        user_validations = self.get_user_validations(username)
-        return all(clause_idx in user_validations for clause_idx in range(len(self.charte["charte"])))
 
     @commands.command()
     async def hello(self, ctx):
@@ -113,7 +87,7 @@ class UserCommandsCog(commands.Cog):
                 description=user_list,
                 color=discord.Color.blue()
             )
-            print(user_list)
+            logger.debug(f"Liste utilisateurs: {len(users)} résultats")
         else:
             embed = discord.Embed(
                 title="📜 Liste des utilisateurs enregistrés",
@@ -144,80 +118,109 @@ class UserCommandsCog(commands.Cog):
     @commands.command(name="pseudo")
     async def update_pseudo(self, ctx, new_pseudo: str):
         """Permet à un utilisateur de modifier son display_name."""
-        async with self.bot.db_pool.acquire() as connection:
-            query = """
-            UPDATE user_profile
-            SET discord_name = $1
-            WHERE username = $2
-            """
-            await connection.execute(query, new_pseudo, ctx.author.name)
+        # Validation du pseudo
+        is_valid, error = validate_pseudo(new_pseudo)
+        if not is_valid:
+            await ctx.send(f"Erreur: {error}")
+            return
 
-        await ctx.send(f"✅ Votre pseudo a été mis à jour avec succès en `{new_pseudo}`.")
+        try:
+            async with self.bot.db_pool.acquire() as connection:
+                query = """
+                UPDATE user_profile
+                SET discord_name = $1
+                WHERE username = $2
+                """
+                await connection.execute(query, new_pseudo, ctx.author.name)
+
+            await ctx.send(f"Votre pseudo a été mis à jour en `{new_pseudo}`.")
+            logger.info(f"{ctx.author.name} a changé son pseudo en '{new_pseudo}'")
+        except Exception as e:
+            logger.error(f"Erreur mise à jour pseudo: {e}")
+            await ctx.send("Erreur lors de la mise à jour du pseudo.")
 
     @commands.command(name="template")
     async def process_template(self, ctx):
         """Traite l'image jointe à la commande et génère un fichier JSON."""
         if len(ctx.message.attachments) == 0:
-            await ctx.send("❌ Aucune image jointe à la commande.")
+            await ctx.send("Aucune image jointe à la commande.")
             return
 
-        # Télécharger l'image jointe
         attachment = ctx.message.attachments[0]
-        image_path = f"temp_{attachment.filename}"
-        await attachment.save(image_path)
 
-        # Traiter l'image avec le script de traitement
-        json_path = process_image(image_path)
+        # Validation de l'image
+        is_valid, error = validate_image_attachment(attachment.filename, attachment.size)
+        if not is_valid:
+            await ctx.send(f"Erreur: {error}")
+            return
 
-        # Lire le contenu du fichier JSON
-        with open(json_path, "r", encoding="utf-8") as json_file:
-            json_content = json_file.read()
+        try:
+            # Télécharger l'image jointe
+            image_path = TEMP_DIR / f"temp_{attachment.filename}"
+            await attachment.save(str(image_path))
 
-        # Envoyer un message de confirmation avec le contenu du fichier JSON
-        await ctx.send(f"✅ Contenu du fichier JSON généré :\n```json\n{json_content}\n```")
+            # Traiter l'image avec le script de traitement
+            json_path = process_image(str(image_path))
+
+            # Lire le contenu du fichier JSON
+            with open(json_path, "r", encoding="utf-8") as json_file:
+                json_content = json_file.read()
+
+            await ctx.send(f"Contenu du fichier JSON généré :\n```json\n{json_content}\n```")
+            logger.info(f"Template traité pour {ctx.author.name}: {attachment.filename}")
+        except Exception as e:
+            logger.error(f"Erreur traitement template: {e}")
+            await ctx.send("Erreur lors du traitement de l'image.")
 
     @commands.command(name="validate_charte")
     async def validate_charte(self, ctx):
-        """Gère le processus de validation de la charte."""
-        username = str(ctx.author)
+        """Gère le processus de validation manuelle de la charte."""
+        username = str(ctx.author.name)
+
+        # Récupérer le nombre total de clauses et les validations de l'utilisateur
+        total_clauses = await self.db.get_total_clauses()
+        user_validations = await self.db.get_user_validations(username)
+        validated_clause_ids = [clause_idx for clause_idx, validation in user_validations if validation == 1]
 
         # Vérifier si l'utilisateur a déjà validé toutes les clauses
-        if self.is_fully_validated(username):
-            await ctx.send("Vous avez déjà validé toutes les clauses de la charte. Vous êtes désormais membre !")
+        if await self.db.is_fully_validated(username, total_clauses):
+            await ctx.send("Vous avez déjà validé toutes les clauses de la charte. Vous êtes membre !")
             return
 
-        # Afficher les clauses non validées
-        user_validations = self.get_user_validations(username)
-        for clause in self.charte["charte"]:
-            if clause["idx"] not in user_validations:
-                with open(clause["path"], "r", encoding="utf-8") as f:
-                    content = f.read()
-                await ctx.send(f"**Clause {clause['idx']}:**\n{content}")
-                await ctx.send("**Accepte cette clause en entrant 'OK'** ou autre chose pour refuser.")
+        await ctx.send(f"**Il vous reste {total_clauses - len(validated_clause_ids)} clause(s) à valider.**")
 
-                # Attendre la réponse de l'utilisateur
+        # Afficher les clauses non validées une par une
+        for clause in self.charte["charte"]:
+            if clause["idx"] not in validated_clause_ids and clause["validation"] == 1:
+                clause_path = DATA_DIR / clause["path"].replace("data/", "")
+                with open(clause_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+
+                await ctx.send(f"**Clause {clause['idx']} - {clause['name']}:**\n{content}")
+                await ctx.send("Tapez **OK** pour accepter ou **KO** pour refuser.")
+
                 def check(m):
-                    return m.author == ctx.author and m.content.lower() in ["ok", "ko"]
+                    return m.author == ctx.author and m.channel == ctx.channel and m.content.lower() in ["ok", "ko"]
 
                 try:
-                    response = await self.bot.wait_for("message", check=check, timeout=60.0)
+                    response = await self.bot.wait_for("message", check=check, timeout=120.0)
                 except asyncio.TimeoutError:
-                    await ctx.send("Temps écoulé. Veuillez réessayer.")
+                    await ctx.send("Temps écoulé (2 min). Utilisez `!validate_charte` pour reprendre.")
                     return
 
                 if response.content.lower() == "ok":
-                    self.add_validation(username, clause["idx"])
-                    await ctx.send("Clause validée avec succès !")
+                    await self.db.add_validation(username, clause["idx"], 1)
+                    await ctx.send("Clause acceptée !")
+                    logger.info(f"{username} a accepté la clause {clause['idx']}")
                 else:
-                    self.remove_validation(username, clause["idx"])
-                    await ctx.send("Clause dévalidée.")
+                    await self.db.add_validation(username, clause["idx"], 0)
+                    await ctx.send("Clause refusée.")
+                    logger.info(f"{username} a refusé la clause {clause['idx']}")
 
-        # Vérifier si l'utilisateur a validé toutes les clauses
-        if self.is_fully_validated(username):
-            await ctx.send("Félicitations ! Vous avez validé toutes les clauses de la charte. Vous êtes désormais membre !")
+        # Vérification finale
+        if await self.db.is_fully_validated(username, total_clauses):
+            await ctx.send("Bravo ! Vous avez validé toutes les clauses. Bienvenue dans la team !")
 
-# La fonction setup doit utiliser le nom exact de la classe
 async def setup(bot):
     """Ajoute le cog au bot."""
     await bot.add_cog(UserCommandsCog(bot))
-    print("✅ Cog UserCommandsCog correctement ajouté au bot")

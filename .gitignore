@@ -1,8 +1,32 @@
+# Python
 __pycache__/
 *.py[cod]
+*.pyo
+*.pyd
 .venv/
-.env*
+venv/
 .python-version
+
+# Environment & Secrets
+.env
+.env.local
+.env.production
 security/credentials.py
+
+# Temporary files
 temp/
+*.tmp
+
+# Logs
+logs/
 *.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

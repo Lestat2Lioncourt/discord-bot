@@ -5,11 +5,15 @@ import json
 import re
 import os
 import numpy as np
-import logging
+import sys
+from pathlib import Path
 
-# Configuration du logging
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
+# Ajouter le dossier parent au path pour importer config
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from config import TEMP_DIR
+from utils.logger import get_logger
+
+logger = get_logger("utils.image_processing")
 
 def preprocess_image(image: np.ndarray) -> np.ndarray:
     """Prétraite l'image pour améliorer la reconnaissance de texte."""
@@ -86,10 +90,6 @@ def process_image(image_path: str, del_image: bool = True) -> str:
 
         logger.info(f"Traitement de l'image: {image_path}")
 
-        # Création du dossier temporaire
-        temp_dir = "temp"
-        os.makedirs(temp_dir, exist_ok=True)
-
         # Lecture de l'image
         image = cv2.imread(image_path)
         if image is None:
@@ -99,8 +99,8 @@ def process_image(image_path: str, del_image: bool = True) -> str:
         processed = preprocess_image(image)
 
         # Sauvegarde de l'image prétraitée pour debug
-        debug_path = os.path.join(temp_dir, "debug_processed.png")
-        cv2.imwrite(debug_path, processed)
+        debug_path = TEMP_DIR / "debug_processed.png"
+        cv2.imwrite(str(debug_path), processed)
         logger.debug(f"Image prétraitée sauvegardée: {debug_path}")
 
         # Extraction du texte
@@ -153,7 +153,7 @@ def process_image(image_path: str, del_image: bool = True) -> str:
             raise ValueError(f"Données manquantes: {', '.join(missing_fields)}")
 
         # Sauvegarde JSON
-        json_path = os.path.join(temp_dir, "personnage.json")
+        json_path = TEMP_DIR / "personnage.json"
         with open(json_path, "w", encoding="utf-8") as json_file:
             json.dump(character_data, json_file, indent=4, ensure_ascii=False)
 
@@ -164,9 +164,9 @@ def process_image(image_path: str, del_image: bool = True) -> str:
             os.remove(image_path)
             logger.debug(f"Image originale supprimée: {image_path}")
 
-        return json_path
+        return str(json_path)
 
     except Exception as e:
         logger.error(f"Erreur lors du traitement: {str(e)}", exc_info=True)
-        # Ne pas lever l'exception, retourner une chaîne vide ou un chemin par défaut
-        return os.path.join(temp_dir, "error.json")
+        # Ne pas lever l'exception, retourner un chemin par défaut
+        return str(TEMP_DIR / "error.json")
