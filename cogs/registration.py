@@ -71,74 +71,83 @@ class RegistrationCog(commands.Cog):
         await self.send_charte(member, dm_channel)
 
     async def send_charte(self, member: discord.Member, dm_channel: discord.DMChannel):
-        """Envoie la charte clause par clause."""
+        """Envoie la charte par blocs avec bouton Suivant, validation a la fin."""
         username = member.name
 
-        # Charger les textes de la charte
-        charte_files = [
-            ("0_intro", False),  # (key, needs_validation)
-            ("1_regles_generales", True),
-            ("2_structure_roles", True),
-            ("3_regles_fonctionnement", True),
-        ]
+        # Charger et concatener tous les textes
+        charte_files = ["0_intro", "1_regles_generales", "2_structure_roles", "3_regles_fonctionnement"]
+        full_text = ""
 
-        for key, needs_validation in charte_files:
+        for key in charte_files:
             if key not in CHARTE_TEXTS:
                 continue
-
             file_path = CHARTE_TEXTS[key]
             if not file_path.exists():
                 logger.warning(f"Fichier charte introuvable: {file_path}")
                 continue
-
             with open(file_path, "r", encoding="utf-8") as f:
-                text = f.read()
+                full_text += f.read() + "\n\n"
 
-            # Decouper si trop long (limite Discord: 2000 chars)
-            chunks = [text[i:i+1900] for i in range(0, len(text), 1900)]
+        # Decouper en blocs lisibles (~1500 chars pour eviter scroll)
+        chunks = []
+        current_chunk = ""
+        for line in full_text.split("\n"):
+            if len(current_chunk) + len(line) + 1 > 1500:
+                chunks.append(current_chunk.strip())
+                current_chunk = line + "\n"
+            else:
+                current_chunk += line + "\n"
+        if current_chunk.strip():
+            chunks.append(current_chunk.strip())
 
-            for chunk in chunks:
-                await dm_channel.send(chunk)
-                await asyncio.sleep(0.5)
+        # Afficher chaque bloc avec bouton Suivant
+        for i, chunk in enumerate(chunks):
+            await dm_channel.send(chunk)
 
-            if needs_validation:
-                # Creer les boutons de validation
-                view = CharteValidationView(self, member, key)
-                msg = await dm_channel.send(
-                    "**Acceptes-tu cette clause ?**",
-                    view=view
-                )
-                view.message = msg
+            # Bouton Suivant sauf pour le dernier bloc
+            if i < len(chunks) - 1:
+                view = NextButtonView(member)
+                await dm_channel.send("─" * 30, view=view)
 
-                # Attendre la reponse
                 try:
-                    await asyncio.wait_for(view.wait(), timeout=300)  # 5 min
+                    await asyncio.wait_for(view.wait(), timeout=300)
                 except asyncio.TimeoutError:
-                    await dm_channel.send(
-                        "Temps ecoule. L'inscription est annulee.\n"
-                        "Tape `!inscription` pour recommencer."
-                    )
+                    await dm_channel.send("Temps ecoule. Tape `!inscription` pour recommencer.")
                     self.active_registrations.pop(username, None)
                     return
 
-                if not view.accepted:
-                    await dm_channel.send(
-                        "L'acceptation de la charte est **obligatoire** pour rejoindre la team.\n"
-                        "Ton inscription est annulee.\n\n"
-                        "Si tu changes d'avis, tape `!inscription` pour recommencer."
-                    )
-                    self.active_registrations.pop(username, None)
-                    return
+        # Validation finale
+        await asyncio.sleep(0.5)
+        view = CharteValidationView(self, member, "final")
+        await dm_channel.send(
+            "─" * 30 + "\n"
+            "**Acceptes-tu cette charte dans son integralite ?**\n"
+            "*En acceptant, tu t'engages a respecter ces regles.*",
+            view=view
+        )
 
-        # Toutes les clauses acceptees
+        try:
+            await asyncio.wait_for(view.wait(), timeout=300)
+        except asyncio.TimeoutError:
+            await dm_channel.send("Temps ecoule. Tape `!inscription` pour recommencer.")
+            self.active_registrations.pop(username, None)
+            return
+
+        if not view.accepted:
+            await dm_channel.send(
+                "L'acceptation de la charte est **obligatoire** pour rejoindre la team.\n"
+                "Ton inscription est annulee.\n\n"
+                "Si tu changes d'avis, tape `!inscription` pour recommencer."
+            )
+            self.active_registrations.pop(username, None)
+            return
+
+        # Charte validee
         async with self.bot.db_pool.acquire() as conn:
             profile = await UserProfile.get_or_create_user(username, conn, member)
             await profile.validate_charte()
 
-        await dm_channel.send(
-            "Parfait ! Tu as accepte toute la charte.\n\n"
-            "Passons a l'enregistrement de tes joueurs..."
-        )
+        await dm_channel.send("Charte acceptee !")
         await asyncio.sleep(1)
 
         # Etape 2: Joueurs Team 1
@@ -150,15 +159,22 @@ class RegistrationCog(commands.Cog):
         """Demande les joueurs pour une equipe."""
         username = member.name
 
-        # Message selon l'equipe
+        # Message bien visible
+        await dm_channel.send("═" * 35)
+
         if is_main_team:
-            prompt = f"**Ajouter un joueur dans {team_name}** (equipe principale)\n"
+            await dm_channel.send(
+                f"🎾 **ENREGISTREMENT DE TES JOUEURS** 🎾\n\n"
+                f"📋 **Equipe : {team_name}** (equipe principale)\n\n"
+                f"Saisis le **nom de ton joueur** tel qu'il apparait dans le jeu.\n"
+                f"Tape `.` si tu n'as pas de joueur dans cette equipe."
+            )
         else:
-            prompt = f"**Ajouter un joueur dans {team_name}**\n"
-
-        prompt += "Saisis le nom du joueur, ou `.` si aucun :"
-
-        await dm_channel.send(prompt)
+            await dm_channel.send(
+                f"📋 **Equipe : {team_name}**\n\n"
+                f"Saisis le **nom de ton joueur** dans cette equipe.\n"
+                f"Tape `.` si tu n'as pas de joueur ici."
+            )
 
         players_added = []
         while True:
@@ -408,7 +424,8 @@ class RegistrationCog(commands.Cog):
         """Demarre uniquement la saisie des joueurs (sans charte)."""
         username = member.name
 
-        await dm_channel.send("**Ajout de joueurs**\n")
+        await dm_channel.send("═" * 35)
+        await dm_channel.send("🎾 **GESTION DE TES JOUEURS** 🎾")
         await asyncio.sleep(0.5)
 
         # Team 1
@@ -433,12 +450,15 @@ class RegistrationCog(commands.Cog):
         username = member.name
 
         if is_main_team:
-            prompt = f"**Ajouter un joueur dans {team_name}** (equipe principale)\n"
+            await dm_channel.send(
+                f"📋 **{team_name}** (equipe principale)\n"
+                f"Nom du joueur ou `.` si aucun :"
+            )
         else:
-            prompt = f"**Ajouter un joueur dans {team_name}**\n"
-
-        prompt += "Saisis le nom du joueur, ou `.` si aucun :"
-        await dm_channel.send(prompt)
+            await dm_channel.send(
+                f"📋 **{team_name}**\n"
+                f"Nom du joueur ou `.` si aucun :"
+            )
 
         while True:
             def check(m):
@@ -563,6 +583,21 @@ class YesNoView(View):
             return
         self.answer = False
         await interaction.response.edit_message(view=None)
+        self.stop()
+
+
+class NextButtonView(View):
+    """Vue avec bouton Suivant."""
+
+    def __init__(self, member: discord.Member):
+        super().__init__(timeout=300)
+        self.member = member
+
+    @discord.ui.button(label="Suivant", style=ButtonStyle.primary, emoji="➡️")
+    async def next(self, interaction: Interaction, button: Button):
+        if interaction.user != self.member:
+            return
+        await interaction.response.edit_message(content="─" * 30, view=None)
         self.stop()
 
 
