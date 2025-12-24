@@ -10,6 +10,19 @@
 -- =============================================================================
 
 -- -----------------------------------------------------------------------------
+-- 0. Ajouter contrainte unique sur user_profile.username (requis pour FK)
+-- -----------------------------------------------------------------------------
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'user_profile_username_unique'
+    ) THEN
+        ALTER TABLE user_profile ADD CONSTRAINT user_profile_username_unique UNIQUE (username);
+    END IF;
+END $$;
+
+-- -----------------------------------------------------------------------------
 -- 1. Créer la table teams
 -- -----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS teams (
