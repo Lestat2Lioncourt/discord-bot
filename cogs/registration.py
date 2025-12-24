@@ -187,8 +187,12 @@ class RegistrationCog(commands.Cog):
                     players_added.append(player_name)
                     await dm_channel.send(f"Joueur **{player_name}** ajoute ! (`.` pour terminer, ou autre nom) :")
                 except Exception as e:
-                    logger.error(f"Erreur creation joueur: {e}")
-                    await dm_channel.send(f"Erreur lors de l'ajout. Reessaie :")
+                    error_msg = str(e)
+                    if "unique_player_per_team" in error_msg or "duplicate key" in error_msg.lower():
+                        await dm_channel.send(f"Le joueur **{player_name}** existe deja dans cette equipe. Autre nom ou `.` :")
+                    else:
+                        logger.error(f"Erreur creation joueur: {e}")
+                        await dm_channel.send(f"Erreur lors de l'ajout. Reessaie :")
 
             except asyncio.TimeoutError:
                 await dm_channel.send("Temps ecoule, on continue...")
@@ -458,8 +462,12 @@ class RegistrationCog(commands.Cog):
                     await Player.create(self.bot.db_pool, username, player_name, team_id)
                     await dm_channel.send(f"Joueur **{player_name}** ajoute ! (`.` pour terminer, ou autre nom) :")
                 except Exception as e:
-                    logger.error(f"Erreur creation joueur: {e}")
-                    await dm_channel.send(f"Erreur. Reessaie :")
+                    error_msg = str(e)
+                    if "unique_player_per_team" in error_msg or "duplicate key" in error_msg.lower():
+                        await dm_channel.send(f"Le joueur **{player_name}** existe deja. Autre nom ou `.` :")
+                    else:
+                        logger.error(f"Erreur creation joueur: {e}")
+                        await dm_channel.send(f"Erreur. Reessaie :")
 
             except asyncio.TimeoutError:
                 await dm_channel.send("Temps ecoule.")
