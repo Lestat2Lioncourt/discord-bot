@@ -61,13 +61,10 @@ CHARTE_JSON_PATH = DATA_DIR / "charte.json"
 
 # Fichiers texte de la charte
 CHARTE_TEXTS = {
-    "0a_intro": TEXTS_DIR / "charte_0a_intro.txt",
-    "0b_intro": TEXTS_DIR / "charte_0b_intro.txt",
+    "0_intro": TEXTS_DIR / "charte_0_intro.txt",
     "1_regles_generales": TEXTS_DIR / "charte_1_regles_generales.txt",
     "2_structure_roles": TEXTS_DIR / "charte_2_structure_roles.txt",
     "3_regles_fonctionnement": TEXTS_DIR / "charte_3_regles_fonctionnement.txt",
-    "4_sanctions": TEXTS_DIR / "charte_4_sanctions.txt",
-    "5_engagement": TEXTS_DIR / "charte_5_engagement.txt",
 }
 
 # =============================================================================

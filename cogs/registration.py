@@ -76,13 +76,10 @@ class RegistrationCog(commands.Cog):
 
         # Charger les textes de la charte
         charte_files = [
-            ("0a_intro", False),  # (key, needs_validation)
-            ("0b_intro", False),
+            ("0_intro", False),  # (key, needs_validation)
             ("1_regles_generales", True),
             ("2_structure_roles", True),
             ("3_regles_fonctionnement", True),
-            ("4_sanctions", True),
-            ("5_engagement", True),
         ]
 
         for key, needs_validation in charte_files:
