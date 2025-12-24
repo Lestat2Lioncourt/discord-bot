@@ -1,0 +1,8 @@
+__pycache__/
+*.py[cod]
+.venv/
+.env*
+.python-version
+security/credentials.py
+temp/
+*.log

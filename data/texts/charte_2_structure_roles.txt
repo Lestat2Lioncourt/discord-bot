@@ -1,0 +1,17 @@
+# 2️⃣ Structure & Rôles du Serveur
+🛡️ Administrateurs
+
+Gèrent le serveur et prennent les décisions importantes.
+Peuvent sanctionner (avertissement, mute, kick, ban) en cas de non-respect des règles.
+⚖️ Sages (Modérateurs)
+
+Veillent au respect des règles et à la bonne ambiance.
+Peuvent donner des avertissements et signaler les problèmes aux administrateurs.
+👥 Membres
+
+Joueurs actifs et confirmés de l’équipe Tennis Clash.
+Peuvent participer aux discussions et événements du serveur.
+🛎️ Réception
+
+Nouveaux arrivants ou anciens membres inactifs.
+Ont un accès limité au serveur en attendant leur validation en tant que membre.
