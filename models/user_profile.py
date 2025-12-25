@@ -200,6 +200,33 @@ class UserProfile:
 
         return f"Charte: {charte_status} | Statut: {approval_display}"
 
+    async def approve(self) -> None:
+        """Approuve le membre."""
+        query = "UPDATE user_profile SET approval_status = 'approved' WHERE username = $1"
+        await self.db_connection.execute(query, self.username)
+        self.approval_status = "approved"
+        logger.info(f"Membre {self.username} approuvé")
+
+    async def refuse(self) -> None:
+        """Refuse le membre."""
+        query = "UPDATE user_profile SET approval_status = 'refused' WHERE username = $1"
+        await self.db_connection.execute(query, self.username)
+        self.approval_status = "refused"
+        logger.info(f"Membre {self.username} refusé")
+
+    @staticmethod
+    async def get_pending_members(db_pool) -> list:
+        """Récupère tous les membres en attente d'approbation."""
+        query = """
+        SELECT username, discord_name, charte_validated, creation_date
+        FROM user_profile
+        WHERE approval_status = 'pending' AND charte_validated = TRUE
+        ORDER BY creation_date DESC
+        """
+        async with db_pool.acquire() as conn:
+            rows = await conn.fetch(query)
+            return [dict(row) for row in rows]
+
     def __str__(self) -> str:
         return (
             f"UserProfile(username={self.username}, discord_name={self.discord_name}, "
