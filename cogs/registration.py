@@ -23,6 +23,7 @@ from utils.database import Database
 from utils.logger import get_logger
 from utils.roles import is_newbie, is_membre, is_sage
 from utils.i18n import t, Translator
+from cogs.sages import notify_sages_new_registration
 from config import CHARTE_FILES, DATA_DIR, CHANNEL_ACCUEIL_ID
 
 logger = get_logger("cogs.registration")
@@ -383,6 +384,9 @@ class RegistrationCog(commands.Cog):
 
         await dm_channel.send(summary)
         logger.info(f"Inscription terminee pour {username}, en attente de validation")
+
+        # Notifier les Sages
+        await notify_sages_new_registration(self.bot, member, profile, players)
 
     @commands.command(name="inscription")
     async def cmd_inscription(self, ctx):
