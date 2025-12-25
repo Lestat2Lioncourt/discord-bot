@@ -48,7 +48,8 @@ bot = commands.Bot(
     command_prefix=BOT_PREFIX,
     intents=intents,
     help_command=None,
-    strip_after_prefix=True
+    strip_after_prefix=True,
+    case_insensitive=True  # Ignore la casse (utile sur mobile)
 )
 
 # -------------------------------------------------------------------------------
