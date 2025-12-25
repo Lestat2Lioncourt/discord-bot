@@ -1,5 +1,8 @@
 """
 Modèle UserProfile - Représente le profil d'un membre Discord.
+
+Utilise discord_id (permanent) comme identifiant principal.
+Le username est stocké mais mis à jour automatiquement s'il change.
 """
 
 import asyncpg
@@ -17,8 +20,9 @@ logger = get_logger("models.user_profile")
 class UserProfile:
     """Représente le profil d'un utilisateur Discord."""
 
-    def __init__(self, username: str, db_connection, discord_name: str = None,
-                 last_connection: datetime = None):
+    def __init__(self, discord_id: int, db_connection, username: str = None,
+                 discord_name: str = None, last_connection: datetime = None):
+        self.discord_id = discord_id
         self.username = username
         self.db_connection = db_connection
         self.discord_name = discord_name
@@ -36,82 +40,157 @@ class UserProfile:
         self.approval_status = "pending"  # pending, approved, refused
 
     @classmethod
-    async def get_or_create_user(cls, username: str, db_connection, member=None) -> 'UserProfile':
-        """Récupère ou crée un profil utilisateur."""
-        logger.debug(f"Vérification du profil pour {username}")
+    async def get_or_create(cls, member, db_connection) -> 'UserProfile':
+        """Récupère ou crée un profil utilisateur par discord_id."""
+        discord_id = member.id
+        username = member.name
+        display_name = member.display_name
 
+        logger.debug(f"Vérification du profil pour discord_id={discord_id}")
+
+        # Chercher par discord_id d'abord
         query = """
-        SELECT username, discord_name, last_connection, charte_validated, approval_status, language
-        FROM user_profile WHERE username = $1
+        SELECT discord_id, username, discord_name, last_connection,
+               charte_validated, approval_status, language
+        FROM user_profile WHERE discord_id = $1
         """
-        existing_user = await db_connection.fetchrow(query, username)
+        existing_user = await db_connection.fetchrow(query, discord_id)
 
         if existing_user:
-            logger.debug(f"Profil existant pour {username}")
+            logger.debug(f"Profil existant pour discord_id={discord_id}")
 
-            # Vérifier si le nom d'affichage a changé
-            if member and existing_user['discord_name'] != member.display_name:
-                update_query = """
-                UPDATE user_profile SET discord_name = $1 WHERE username = $2
-                """
-                await db_connection.execute(update_query, member.display_name, username)
-                logger.debug(f"Nom d'affichage mis à jour pour {username}")
+            # Mettre à jour username et display_name si changés
+            updates = []
+            params = []
+            param_idx = 1
+
+            if existing_user['username'] != username:
+                updates.append(f"username = ${param_idx}")
+                params.append(username)
+                param_idx += 1
+                logger.info(f"Username mis à jour: {existing_user['username']} -> {username}")
+
+                # Mettre à jour aussi dans la table players
+                await db_connection.execute(
+                    "UPDATE players SET member_username = $1 WHERE member_username = $2",
+                    username, existing_user['username']
+                )
+                logger.info(f"Players mis à jour pour le nouveau username")
+
+            if existing_user['discord_name'] != display_name:
+                updates.append(f"discord_name = ${param_idx}")
+                params.append(display_name)
+                param_idx += 1
+
+            if updates:
+                params.append(discord_id)
+                update_query = f"UPDATE user_profile SET {', '.join(updates)} WHERE discord_id = ${param_idx}"
+                await db_connection.execute(update_query, *params)
 
             profile = cls(
-                username,
+                discord_id,
                 db_connection,
-                member.display_name if member else existing_user['discord_name'],
+                username,
+                display_name,
                 existing_user['last_connection']
             )
             profile.charte_validated = existing_user.get('charte_validated', False)
             profile.approval_status = existing_user.get('approval_status', 'pending')
-            profile.language = existing_user.get('language', 'fr')
+            profile.language = existing_user.get('language', 'FR')
+            return profile
+
+        # Vérifier si un profil existe avec cet username (migration)
+        query_by_username = """
+        SELECT discord_id, username, discord_name, last_connection,
+               charte_validated, approval_status, language
+        FROM user_profile WHERE username = $1 AND discord_id IS NULL
+        """
+        existing_by_username = await db_connection.fetchrow(query_by_username, username)
+
+        if existing_by_username:
+            # Migrer le profil existant vers discord_id
+            logger.info(f"Migration du profil {username} vers discord_id={discord_id}")
+            update_query = """
+            UPDATE user_profile SET discord_id = $1, discord_name = $2 WHERE username = $3
+            """
+            await db_connection.execute(update_query, discord_id, display_name, username)
+
+            profile = cls(
+                discord_id,
+                db_connection,
+                username,
+                display_name,
+                existing_by_username['last_connection']
+            )
+            profile.charte_validated = existing_by_username.get('charte_validated', False)
+            profile.approval_status = existing_by_username.get('approval_status', 'pending')
+            profile.language = existing_by_username.get('language', 'FR')
             return profile
 
         # Créer un nouveau profil
         insert_query = """
-        INSERT INTO user_profile (username, discord_name, last_connection, charte_validated, approval_status)
-        VALUES ($1, $2, $3, FALSE, 'pending')
+        INSERT INTO user_profile (discord_id, username, discord_name, last_connection,
+                                  charte_validated, approval_status)
+        VALUES ($1, $2, $3, $4, FALSE, 'pending')
         """
         await db_connection.execute(
             insert_query,
+            discord_id,
             username,
-            member.display_name if member else None,
+            display_name,
             datetime.now()
         )
-        logger.info(f"Nouveau profil créé: {username}")
-
-        # Envoyer un message de bienvenue
-        if member:
-            try:
-                await member.send(
-                    f"Bienvenue {username} ! Ton profil a été créé.\n"
-                    f"Utilise `!inscription` pour compléter ton inscription."
-                )
-                logger.debug(f"Message de bienvenue envoyé à {username}")
-            except Exception as e:
-                logger.warning(f"Impossible d'envoyer le DM à {username}: {e}")
+        logger.info(f"Nouveau profil créé: {username} (discord_id={discord_id})")
 
         profile = cls(
-            username,
+            discord_id,
             db_connection,
-            member.display_name if member else None,
+            username,
+            display_name,
             datetime.now()
         )
         profile.charte_validated = False
         profile.approval_status = "pending"
         return profile
 
+    # Alias pour compatibilité avec l'ancien code
+    @classmethod
+    async def get_or_create_user(cls, username: str, db_connection, member=None) -> 'UserProfile':
+        """Compatibilité: utilise get_or_create avec le membre."""
+        if member:
+            return await cls.get_or_create(member, db_connection)
+
+        # Fallback: chercher par username si pas de membre
+        query = """
+        SELECT discord_id, username, discord_name, last_connection,
+               charte_validated, approval_status, language
+        FROM user_profile WHERE username = $1
+        """
+        row = await db_connection.fetchrow(query, username)
+        if row:
+            profile = cls(
+                row['discord_id'],
+                db_connection,
+                row['username'],
+                row['discord_name'],
+                row['last_connection']
+            )
+            profile.charte_validated = row.get('charte_validated', False)
+            profile.approval_status = row.get('approval_status', 'pending')
+            profile.language = row.get('language', 'FR')
+            return profile
+        return None
+
     async def load_from_db(self) -> None:
         """Charge les informations complètes depuis la base de données."""
         query = """
         SELECT language, localisation, latitude, longitude,
                discord_name, last_connection, creation_date,
-               charte_validated, approval_status
-        FROM user_profile WHERE username = $1
+               charte_validated, approval_status, username
+        FROM user_profile WHERE discord_id = $1
         """
         try:
-            result = await self.db_connection.fetchrow(query, self.username)
+            result = await self.db_connection.fetchrow(query, self.discord_id)
             if result:
                 self.language = result.get("language") or "FR"
                 self.localisation = result["localisation"]
@@ -122,30 +201,29 @@ class UserProfile:
                 self.creation_date = result["creation_date"]
                 self.charte_validated = result.get("charte_validated", False)
                 self.approval_status = result.get("approval_status", "pending")
+                self.username = result["username"]
         except Exception as e:
-            logger.error(f"Erreur chargement profil {self.username}: {e}")
+            logger.error(f"Erreur chargement profil discord_id={self.discord_id}: {e}")
 
     async def save(self) -> None:
         """Enregistre les modifications dans la base de données."""
         query = """
         UPDATE user_profile
-        SET discord_name = $1, last_connection = $2
-        WHERE username = $3
+        SET discord_name = $1, last_connection = $2, username = $3
+        WHERE discord_id = $4
         """
         try:
             await self.db_connection.execute(
-                query, self.discord_name, self.last_connection, self.username
+                query, self.discord_name, self.last_connection, self.username, self.discord_id
             )
-            logger.debug(f"Profil mis à jour pour {self.username}")
+            logger.debug(f"Profil mis à jour pour discord_id={self.discord_id}")
         except Exception as e:
-            logger.error(f"Erreur mise à jour profil {self.username}: {e}")
+            logger.error(f"Erreur mise à jour profil discord_id={self.discord_id}: {e}")
 
     async def validate_charte(self) -> None:
         """Marque la charte comme validée."""
-        query = """
-        UPDATE user_profile SET charte_validated = TRUE WHERE username = $1
-        """
-        await self.db_connection.execute(query, self.username)
+        query = "UPDATE user_profile SET charte_validated = TRUE WHERE discord_id = $1"
+        await self.db_connection.execute(query, self.discord_id)
         self.charte_validated = True
         logger.info(f"Charte validée pour {self.username}")
 
@@ -154,9 +232,9 @@ class UserProfile:
         query = """
         UPDATE user_profile
         SET localisation = $1, latitude = $2, longitude = $3
-        WHERE username = $4
+        WHERE discord_id = $4
         """
-        await self.db_connection.execute(query, localisation, latitude, longitude, self.username)
+        await self.db_connection.execute(query, localisation, latitude, longitude, self.discord_id)
         self.localisation = localisation
         self.latitude = latitude
         self.longitude = longitude
@@ -167,9 +245,9 @@ class UserProfile:
         query = """
         UPDATE user_profile
         SET localisation = NULL, latitude = NULL, longitude = NULL
-        WHERE username = $1
+        WHERE discord_id = $1
         """
-        await self.db_connection.execute(query, self.username)
+        await self.db_connection.execute(query, self.discord_id)
         self.localisation = None
         self.latitude = None
         self.longitude = None
@@ -177,12 +255,11 @@ class UserProfile:
 
     async def set_language(self, language: str) -> None:
         """Definit la langue du membre."""
-        # Normaliser en majuscules pour la DB
         language = language.upper() if language else "FR"
         if language not in ("FR", "EN"):
             language = "FR"
-        query = "UPDATE user_profile SET language = $1 WHERE username = $2"
-        await self.db_connection.execute(query, language, self.username)
+        query = "UPDATE user_profile SET language = $1 WHERE discord_id = $2"
+        await self.db_connection.execute(query, language, self.discord_id)
         self.language = language
         logger.debug(f"Langue definie pour {self.username}: {language}")
 
@@ -207,20 +284,19 @@ class UserProfile:
             "refused": "Refusé"
         }
         approval_display = approval_map.get(self.approval_status, self.approval_status)
-
         return f"Charte: {charte_status} | Statut: {approval_display}"
 
     async def approve(self) -> None:
         """Approuve le membre."""
-        query = "UPDATE user_profile SET approval_status = 'approved' WHERE username = $1"
-        await self.db_connection.execute(query, self.username)
+        query = "UPDATE user_profile SET approval_status = 'approved' WHERE discord_id = $1"
+        await self.db_connection.execute(query, self.discord_id)
         self.approval_status = "approved"
         logger.info(f"Membre {self.username} approuvé")
 
     async def refuse(self) -> None:
         """Refuse le membre."""
-        query = "UPDATE user_profile SET approval_status = 'refused' WHERE username = $1"
-        await self.db_connection.execute(query, self.username)
+        query = "UPDATE user_profile SET approval_status = 'refused' WHERE discord_id = $1"
+        await self.db_connection.execute(query, self.discord_id)
         self.approval_status = "refused"
         logger.info(f"Membre {self.username} refusé")
 
@@ -228,7 +304,7 @@ class UserProfile:
     async def get_pending_members(db_pool) -> list:
         """Récupère tous les membres en attente d'approbation."""
         query = """
-        SELECT username, discord_name, charte_validated, creation_date
+        SELECT discord_id, username, discord_name, charte_validated, creation_date
         FROM user_profile
         WHERE approval_status = 'pending' AND charte_validated = TRUE
         ORDER BY creation_date DESC
@@ -238,20 +314,45 @@ class UserProfile:
             return [dict(row) for row in rows]
 
     @classmethod
-    async def get_by_username(cls, db_connection, username: str) -> Optional['UserProfile']:
-        """Récupère un profil par son username (sans le créer s'il n'existe pas)."""
+    async def get_by_discord_id(cls, db_connection, discord_id: int) -> Optional['UserProfile']:
+        """Récupère un profil par son discord_id."""
         query = """
-        SELECT username, discord_name, last_connection, charte_validated, approval_status, language
-        FROM user_profile WHERE username = $1
+        SELECT discord_id, username, discord_name, last_connection,
+               charte_validated, approval_status, language
+        FROM user_profile WHERE discord_id = $1
         """
-        row = await db_connection.fetchrow(query, username)
-
+        row = await db_connection.fetchrow(query, discord_id)
         if not row:
             return None
 
         profile = cls(
-            row['username'],
+            row['discord_id'],
             db_connection,
+            row['username'],
+            row['discord_name'],
+            row['last_connection']
+        )
+        profile.charte_validated = row.get('charte_validated', False)
+        profile.approval_status = row.get('approval_status', 'pending')
+        profile.language = row.get('language', 'FR')
+        return profile
+
+    @classmethod
+    async def get_by_username(cls, db_connection, username: str) -> Optional['UserProfile']:
+        """Récupère un profil par son username."""
+        query = """
+        SELECT discord_id, username, discord_name, last_connection,
+               charte_validated, approval_status, language
+        FROM user_profile WHERE LOWER(username) = LOWER($1)
+        """
+        row = await db_connection.fetchrow(query, username)
+        if not row:
+            return None
+
+        profile = cls(
+            row['discord_id'],
+            db_connection,
+            row['username'],
             row['discord_name'],
             row['last_connection']
         )
@@ -262,6 +363,7 @@ class UserProfile:
 
     def __str__(self) -> str:
         return (
-            f"UserProfile(username={self.username}, discord_name={self.discord_name}, "
-            f"charte_validated={self.charte_validated}, approval_status={self.approval_status})"
+            f"UserProfile(discord_id={self.discord_id}, username={self.username}, "
+            f"discord_name={self.discord_name}, charte_validated={self.charte_validated}, "
+            f"approval_status={self.approval_status})"
         )
