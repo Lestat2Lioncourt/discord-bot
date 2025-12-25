@@ -11,8 +11,12 @@ import asyncio
 from datetime import datetime
 
 from config import CHARTE_JSON_PATH, DATA_DIR, TEMP_DIR
+from models.player import Player
 
 logger = get_logger("cogs.user_commands")
+
+# Chemin du template de carte
+MAP_TEMPLATE_PATH = DATA_DIR / "map_template.html"
 
 USERS_PER_PAGE = 20
 
@@ -205,6 +209,70 @@ class UserCommandsCog(commands.Cog):
         except Exception as e:
             logger.error(f"Erreur traitement template: {e}")
             await ctx.send("Erreur lors du traitement de l'image.")
+
+    @commands.command(name="carte", aliases=["map", "members-map"])
+    async def generate_map(self, ctx):
+        """Genere une carte interactive des membres avec leur localisation."""
+        await ctx.send("Generation de la carte en cours...")
+
+        try:
+            # Recuperer les membres avec localisation
+            async with self.bot.db_pool.acquire() as conn:
+                rows = await conn.fetch("""
+                    SELECT username, discord_name, localisation, latitude, longitude
+                    FROM user_profile
+                    WHERE latitude IS NOT NULL AND longitude IS NOT NULL
+                    AND approval_status = 'approved'
+                """)
+
+            if not rows:
+                await ctx.send("Aucun membre n'a renseigne sa localisation.")
+                return
+
+            # Construire les donnees des membres
+            members_data = []
+            for row in rows:
+                username = row['username']
+                display_name = row['discord_name'] or username
+
+                # Recuperer les joueurs de ce membre
+                players = await Player.get_by_member(self.bot.db_pool, username)
+                player_names = [p.player_name for p in players] if players else []
+
+                members_data.append({
+                    "name": display_name,
+                    "location": row['localisation'] or "",
+                    "lat": float(row['latitude']),
+                    "lng": float(row['longitude']),
+                    "players": player_names
+                })
+
+            # Lire le template
+            with open(MAP_TEMPLATE_PATH, "r", encoding="utf-8") as f:
+                template = f.read()
+
+            # Remplacer les placeholders
+            html_content = template.replace("{{MEMBERS_JSON}}", json.dumps(members_data, ensure_ascii=False))
+            html_content = html_content.replace("{{MEMBER_COUNT}}", str(len(members_data)))
+            html_content = html_content.replace("{{DATE}}", datetime.now().strftime("%d/%m/%Y %H:%M"))
+
+            # Sauvegarder le fichier temporaire
+            map_file = TEMP_DIR / "carte_membres.html"
+            with open(map_file, "w", encoding="utf-8") as f:
+                f.write(html_content)
+
+            # Envoyer le fichier
+            await ctx.send(
+                f"Carte generee avec **{len(members_data)}** membres localises.\n"
+                "Ouvre le fichier dans ton navigateur pour voir la carte interactive.",
+                file=discord.File(str(map_file), filename="carte_membres.html")
+            )
+
+            logger.info(f"Carte generee par {ctx.author.name}: {len(members_data)} membres")
+
+        except Exception as e:
+            logger.error(f"Erreur generation carte: {e}")
+            await ctx.send("Erreur lors de la generation de la carte.")
 
 
 class UsersPaginationView(View):
