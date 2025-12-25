@@ -171,18 +171,48 @@ class RegistrationCog(commands.Cog):
         username = member.name
 
         await dm_channel.send(
-            "═══════════════════════════════════════\n"
-            "📝 **4. COMPLETE TON PROFIL**\n"
-            "═══════════════════════════════════════"
+            "# 4️⃣ Complete ton profil"
         )
         await asyncio.sleep(0.5)
 
+        # Verifier si le membre a deja des joueurs enregistres
+        existing_players = await Player.get_by_member(self.bot.db_pool, username)
+
+        if existing_players:
+            # Afficher les joueurs existants
+            team1 = [p.player_name for p in existing_players if p.team_name == "This Is PSG"]
+            team2 = [p.player_name for p in existing_players if p.team_name == "This Is PSG 2"]
+
+            msg = "**Tu as deja des joueurs enregistres :**\n"
+            if team1:
+                msg += f"• This Is PSG : {', '.join(team1)}\n"
+            if team2:
+                msg += f"• This Is PSG 2 : {', '.join(team2)}\n"
+            msg += "\nVeux-tu les **conserver** ou **tout effacer** et recommencer ?"
+
+            await dm_channel.send(msg)
+
+            view = KeepOrResetView(member)
+            await dm_channel.send("Choisis une option :", view=view)
+
+            try:
+                await asyncio.wait_for(view.wait(), timeout=300)
+            except asyncio.TimeoutError:
+                await dm_channel.send("Temps ecoule, on conserve les joueurs existants.")
+                view.keep = True
+
+            if not view.keep:
+                # Supprimer tous les joueurs existants
+                await Player.delete_all_for_member(self.bot.db_pool, username)
+                await dm_channel.send("Joueurs effaces. On recommence...")
+                await asyncio.sleep(0.5)
+
         # 4.1 Joueurs
         await dm_channel.send(
-            "**4.1. Tes joueurs dans le jeu**\n\n"
+            "**4.1 Tes joueurs dans le jeu**\n\n"
             "Saisis les noms de tes joueurs **tels qu'ils apparaissent dans Tennis Clash**.\n"
             "Tu peux avoir plusieurs joueurs dans chaque equipe.\n"
-            "Tape `.` pour passer a l'equipe suivante si tu n'as pas de joueur."
+            "Tape `.` pour passer a l'equipe suivante."
         )
         await asyncio.sleep(0.5)
 
@@ -251,44 +281,29 @@ class RegistrationCog(commands.Cog):
     async def ask_location(self, member: discord.Member, dm_channel: discord.DMChannel):
         """Demande la localisation (optionnel)."""
         await dm_channel.send(
-            "**4.2. Ta localisation**\n\n"
-            "📍 *Facultatif* - Permet de t'afficher sur la **carte des membres**.\n\n"
+            "**4.2 Ta localisation** *(facultatif)*\n\n"
+            "📍 Permet de t'afficher sur la **carte des membres**.\n\n"
             "Tu peux etre plus ou moins precis :\n"
             "• Simple : pays ou region (*France*, *Bretagne*)\n"
             "• Precis : ville ou adresse (*Paris*, *75001 Paris*)\n\n"
-            "Ta position GPS sera calculee pour la carte."
+            "Saisis ta localisation ou `.` pour passer :"
         )
-        await asyncio.sleep(0.3)
 
-        view = YesNoView(member)
-        await dm_channel.send("**Veux-tu saisir ta localisation ?**", view=view)
+        def check(m):
+            return m.author == member and isinstance(m.channel, discord.DMChannel)
 
         try:
-            await asyncio.wait_for(view.wait(), timeout=300)
-        except asyncio.TimeoutError:
-            await self.finish_registration(member, dm_channel)
-            return
+            msg = await self.bot.wait_for("message", check=check, timeout=120)
+            location = msg.content.strip()
 
-        if view.answer:
-            await dm_channel.send("Indique ta localisation :")
-
-            def check(m):
-                return m.author == member and isinstance(m.channel, discord.DMChannel)
-
-            try:
-                msg = await self.bot.wait_for("message", check=check, timeout=120)
-                location = msg.content.strip()
-
-                if location:
-                    await self.save_location(member, dm_channel, location)
-                else:
-                    await dm_channel.send("Localisation ignoree.")
-                    await self.finish_registration(member, dm_channel)
-
-            except asyncio.TimeoutError:
-                await dm_channel.send("Temps ecoule.")
+            if location and location != ".":
+                await self.save_location(member, dm_channel, location)
+            else:
+                await dm_channel.send("Localisation ignoree.")
                 await self.finish_registration(member, dm_channel)
-        else:
+
+        except asyncio.TimeoutError:
+            await dm_channel.send("Temps ecoule.")
             await self.finish_registration(member, dm_channel)
 
     async def save_location(self, member: discord.Member, dm_channel: discord.DMChannel, location: str):
@@ -639,6 +654,39 @@ class NextButtonView(View):
         await interaction.response.defer()
 
         # Le wait_for("interaction") dans send_charte va capter cet evenement
+
+
+class KeepOrResetView(View):
+    """Vue pour choisir de conserver ou effacer les joueurs existants."""
+
+    def __init__(self, member: discord.Member):
+        super().__init__(timeout=300)
+        self.member = member
+        self.keep = None
+
+    @discord.ui.button(label="Conserver", style=ButtonStyle.green)
+    async def keep_btn(self, interaction: Interaction, button: Button):
+        await interaction.response.defer()
+        if interaction.user != self.member:
+            return
+        self.keep = True
+        try:
+            await interaction.message.edit(content="Joueurs conserves.", view=None)
+        except Exception:
+            pass
+        self.stop()
+
+    @discord.ui.button(label="Tout effacer", style=ButtonStyle.red)
+    async def reset_btn(self, interaction: Interaction, button: Button):
+        await interaction.response.defer()
+        if interaction.user != self.member:
+            return
+        self.keep = False
+        try:
+            await interaction.message.edit(content="Effacement des joueurs...", view=None)
+        except Exception:
+            pass
+        self.stop()
 
 
 async def setup(bot):

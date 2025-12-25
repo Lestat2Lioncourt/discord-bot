@@ -137,6 +137,18 @@ class Player:
                 logger.info(f"Joueur '{player_name}' supprimé pour {member_username}")
             return deleted
 
+    @classmethod
+    async def delete_all_for_member(cls, db_pool, member_username: str) -> int:
+        """Supprime tous les joueurs d'un membre. Retourne le nombre de joueurs supprimés."""
+        query = "DELETE FROM players WHERE member_username = $1"
+        async with db_pool.acquire() as conn:
+            result = await conn.execute(query, member_username)
+            # result format: "DELETE N"
+            count = int(result.split()[-1]) if result.startswith("DELETE") else 0
+            if count > 0:
+                logger.info(f"{count} joueur(s) supprimé(s) pour {member_username}")
+            return count
+
 
 @dataclass
 class Team:
