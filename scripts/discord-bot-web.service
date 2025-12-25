@@ -7,8 +7,7 @@ Type=simple
 User=detrax
 Group=detrax
 WorkingDirectory=/home/detrax/Projects/discord_bot
-Environment="PATH=/home/detrax/Projects/discord_bot/.venv/bin"
-ExecStart=/home/detrax/Projects/discord_bot/.venv/bin/python -m web.server
+ExecStart=/home/detrax/.local/bin/uv run python -m web.server
 
 # Variables d'environnement
 Environment="WEB_HOST=0.0.0.0"
