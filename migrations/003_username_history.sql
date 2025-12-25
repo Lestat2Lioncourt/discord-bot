@@ -1,6 +1,10 @@
 -- Migration 003: Historique des usernames
 -- Permet de detecter les membres qui reviennent avec un nouveau username
 
+-- D'abord, ajouter une contrainte unique sur discord_id dans user_profile
+-- (necessaire pour la foreign key)
+ALTER TABLE user_profile ADD CONSTRAINT user_profile_discord_id_unique UNIQUE (discord_id);
+
 -- Table pour stocker l'historique des usernames
 CREATE TABLE IF NOT EXISTS username_history (
     id SERIAL PRIMARY KEY,
@@ -9,8 +13,8 @@ CREATE TABLE IF NOT EXISTS username_history (
     discord_name VARCHAR(100),
     changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
-    -- Index pour recherche rapide par discord_id
-    CONSTRAINT fk_discord_id FOREIGN KEY (discord_id)
+    -- Foreign key vers user_profile
+    CONSTRAINT fk_username_history_discord_id FOREIGN KEY (discord_id)
         REFERENCES user_profile(discord_id) ON DELETE CASCADE
 );
 
@@ -40,7 +44,7 @@ CREATE TRIGGER trigger_username_change
 
 -- Migrer les usernames existants dans l'historique
 INSERT INTO username_history (discord_id, username, discord_name, changed_at)
-SELECT discord_id, username, discord_name, creation_date
+SELECT discord_id, username, discord_name, COALESCE(creation_date, CURRENT_TIMESTAMP)
 FROM user_profile
 WHERE discord_id IS NOT NULL
 ON CONFLICT DO NOTHING;
