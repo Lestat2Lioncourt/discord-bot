@@ -12,6 +12,7 @@ from discord.ext import commands
 from discord import ButtonStyle, Interaction
 from discord.ui import Button, View
 from typing import Optional
+import asyncio
 
 from models.user_profile import UserProfile
 from models.player import Player
@@ -265,6 +266,58 @@ class SagesCog(commands.Cog):
 
         logger.info(f"{username} refuse par {sage.name}" + (f" - Raison: {raison}" if raison else ""))
         return True
+
+    @commands.command(name="check_users", aliases=["check-users", "check_pending"])
+    @sage_only()
+    async def cmd_check_users(self, ctx):
+        """Envoie les notifications pour tous les utilisateurs en attente de validation."""
+        # Recuperer les membres en attente
+        pending = await UserProfile.get_pending_members(self.bot.db_pool)
+
+        if not pending:
+            await ctx.send("Aucun membre en attente de validation.")
+            return
+
+        await ctx.send(f"Envoi des notifications pour **{len(pending)}** membre(s) en attente...")
+
+        count = 0
+        for member_data in pending:
+            username = member_data['username']
+            discord_id = member_data.get('discord_id')
+
+            # Trouver le membre Discord
+            member = None
+            for guild in self.bot.guilds:
+                if discord_id:
+                    member = guild.get_member(discord_id)
+                if not member:
+                    member = discord.utils.find(
+                        lambda m: m.name.lower() == username.lower(),
+                        guild.members
+                    )
+                if member:
+                    break
+
+            if not member:
+                logger.warning(f"Membre {username} non trouve sur le serveur")
+                continue
+
+            # Charger le profil et les joueurs
+            async with self.bot.db_pool.acquire() as conn:
+                profile = await UserProfile.get_or_create_user(username, conn, member)
+                await profile.load_from_db()
+
+            players = await Player.get_by_member(self.bot.db_pool, username)
+
+            # Envoyer la notification
+            await notify_sages_new_registration(self.bot, member, profile, players)
+            count += 1
+
+            # Petit delai pour eviter le rate limiting
+            await asyncio.sleep(0.5)
+
+        await ctx.send(f"**{count}** notification(s) envoyee(s).")
+        logger.info(f"check_users: {count} notifications envoyees par {ctx.author.name}")
 
     @commands.command(name="profil-admin", aliases=["profile-admin"])
     async def cmd_profil_admin(self, ctx, *, search: str = None):
