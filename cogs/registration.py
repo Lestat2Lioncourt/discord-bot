@@ -153,9 +153,8 @@ class RegistrationCog(commands.Cog):
         await dm_channel.send("Charte acceptee !")
         await asyncio.sleep(1)
 
-        # Etape 2: Joueurs Team 1
-        self.active_registrations[username] = "team1"
-        await self.ask_players_for_team(member, dm_channel, 1, "This Is PSG")
+        # Etape 4: Completer le profil
+        await self.complete_profile(member, dm_channel)
 
     async def wait_for_next_click(self, member: discord.Member, timeout: int = 300):
         """Attend que le membre clique sur Suivant."""
@@ -167,27 +166,46 @@ class RegistrationCog(commands.Cog):
 
         await self.bot.wait_for("interaction", check=check, timeout=timeout)
 
+    async def complete_profile(self, member: discord.Member, dm_channel: discord.DMChannel):
+        """Etape 4: Completer le profil (joueurs + localisation)."""
+        username = member.name
+
+        await dm_channel.send(
+            "═══════════════════════════════════════\n"
+            "📝 **4. COMPLETE TON PROFIL**\n"
+            "═══════════════════════════════════════"
+        )
+        await asyncio.sleep(0.5)
+
+        # 4.1 Joueurs
+        await dm_channel.send(
+            "**4.1. Tes joueurs dans le jeu**\n\n"
+            "Saisis les noms de tes joueurs **tels qu'ils apparaissent dans Tennis Clash**.\n"
+            "Tu peux avoir plusieurs joueurs dans chaque equipe.\n"
+            "Tape `.` pour passer a l'equipe suivante si tu n'as pas de joueur."
+        )
+        await asyncio.sleep(0.5)
+
+        # Team 1
+        await self.ask_players_for_team(member, dm_channel, 1, "This Is PSG", is_main_team=True)
+
+        # Team 2
+        await self.ask_players_for_team(member, dm_channel, 2, "This Is PSG 2", is_main_team=False)
+
+        # 4.2 Localisation
+        await asyncio.sleep(0.5)
+        await self.ask_location(member, dm_channel)
+
     async def ask_players_for_team(self, member: discord.Member, dm_channel: discord.DMChannel,
                                     team_id: int, team_name: str, is_main_team: bool = True):
         """Demande les joueurs pour une equipe."""
         username = member.name
 
-        # Message bien visible
-        await dm_channel.send("═" * 35)
-
+        # Message clair
         if is_main_team:
-            await dm_channel.send(
-                f"🎾 **ENREGISTREMENT DE TES JOUEURS** 🎾\n\n"
-                f"📋 **Equipe : {team_name}** (equipe principale)\n\n"
-                f"Saisis le **nom de ton joueur** tel qu'il apparait dans le jeu.\n"
-                f"Tape `.` si tu n'as pas de joueur dans cette equipe."
-            )
+            await dm_channel.send(f"\n▶️ **{team_name}** (equipe principale) :")
         else:
-            await dm_channel.send(
-                f"📋 **Equipe : {team_name}**\n\n"
-                f"Saisis le **nom de ton joueur** dans cette equipe.\n"
-                f"Tape `.` si tu n'as pas de joueur ici."
-            )
+            await dm_channel.send(f"\n▶️ **{team_name}** :")
 
         players_added = []
         while True:
@@ -228,30 +246,22 @@ class RegistrationCog(commands.Cog):
                 break
 
         if players_added:
-            await dm_channel.send(f"{len(players_added)} joueur(s) ajoute(s) dans {team_name}.")
-
-        await asyncio.sleep(0.5)
-
-        # Passer a l'equipe suivante ou a la localisation
-        if team_id == 1:
-            self.active_registrations[username] = "team2"
-            await self.ask_players_for_team(member, dm_channel, 2, "This Is PSG 2", is_main_team=False)
-        else:
-            self.active_registrations[username] = "localisation"
-            await self.ask_location(member, dm_channel)
+            await dm_channel.send(f"✓ {len(players_added)} joueur(s) dans {team_name}")
 
     async def ask_location(self, member: discord.Member, dm_channel: discord.DMChannel):
         """Demande la localisation (optionnel)."""
-        view = YesNoView(member)
         await dm_channel.send(
-            "**Souhaites-tu partager ta localisation ?**\n\n"
-            "Cela permet d'afficher ta position sur la **carte des membres**.\n"
-            "Tu peux etre aussi precis que tu veux :\n"
-            "- General : pays, region (ex: *France*, *Ile-de-France*)\n"
-            "- Precis : ville ou adresse (ex: *Paris*, *75001 Paris*)\n\n"
-            "*Cette information est optionnelle et modifiable a tout moment.*",
-            view=view
+            "**4.2. Ta localisation**\n\n"
+            "📍 *Facultatif* - Permet de t'afficher sur la **carte des membres**.\n\n"
+            "Tu peux etre plus ou moins precis :\n"
+            "• Simple : pays ou region (*France*, *Bretagne*)\n"
+            "• Precis : ville ou adresse (*Paris*, *75001 Paris*)\n\n"
+            "Ta position GPS sera calculee pour la carte."
         )
+        await asyncio.sleep(0.3)
+
+        view = YesNoView(member)
+        await dm_channel.send("**Veux-tu saisir ta localisation ?**", view=view)
 
         try:
             await asyncio.wait_for(view.wait(), timeout=300)
