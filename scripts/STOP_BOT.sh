@@ -1,13 +1,23 @@
 #!/bin/bash
 # =============================================================================
-# Arrête le bot Discord
+# Arrête le bot Discord et le serveur web
 # =============================================================================
 
-SESSION_NAME="bot_session"
+BOT_SESSION="bot_session"
+WEB_SESSION="web_session"
 
-if tmux has-session -t $SESSION_NAME 2>/dev/null; then
-    tmux kill-session -t $SESSION_NAME
-    echo "Bot arrêté et session '$SESSION_NAME' terminée"
+# Arrêter le bot
+if tmux has-session -t $BOT_SESSION 2>/dev/null; then
+    tmux kill-session -t $BOT_SESSION
+    echo "Bot arrêté"
 else
-    echo "Aucune session de bot active"
+    echo "Aucune session bot active"
+fi
+
+# Arrêter le serveur web
+if tmux has-session -t $WEB_SESSION 2>/dev/null; then
+    tmux kill-session -t $WEB_SESSION
+    echo "Serveur web arrêté"
+else
+    echo "Aucune session web active"
 fi

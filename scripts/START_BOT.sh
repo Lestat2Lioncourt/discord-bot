@@ -1,22 +1,31 @@
 #!/bin/bash
 # =============================================================================
-# Démarre le bot Discord dans une session tmux
+# Démarre le bot Discord et le serveur web dans des sessions tmux
 # =============================================================================
 
 set -e
 
 BOT_DIR="${BOT_DIR:-~/Projects/discord_bot}"
-SESSION_NAME="bot_session"
+BOT_SESSION="bot_session"
+WEB_SESSION="web_session"
 
-# Vérifier si une session existe déjà
-if tmux has-session -t $SESSION_NAME 2>/dev/null; then
-    echo "Le bot est déjà en cours d'exécution dans la session '$SESSION_NAME'"
-    echo "Utilisez ./scripts/SHOW_BOT.sh pour voir les logs"
-    exit 0
+# Démarrer le bot
+if tmux has-session -t $BOT_SESSION 2>/dev/null; then
+    echo "Le bot est déjà en cours d'exécution"
+else
+    tmux new-session -d -s $BOT_SESSION "cd $BOT_DIR && uv run python bot.py"
+    echo "Bot démarré dans la session '$BOT_SESSION'"
 fi
 
-# Démarrer le bot dans une nouvelle session tmux
-tmux new-session -d -s $SESSION_NAME "cd $BOT_DIR && source .venv/bin/activate && python bot.py"
+# Démarrer le serveur web
+if tmux has-session -t $WEB_SESSION 2>/dev/null; then
+    echo "Le serveur web est déjà en cours d'exécution"
+else
+    tmux new-session -d -s $WEB_SESSION "cd $BOT_DIR && uv run python -m web.server"
+    echo "Serveur web démarré dans la session '$WEB_SESSION'"
+fi
 
-echo "Bot démarré dans la session tmux '$SESSION_NAME'"
-echo "Utilisez ./scripts/SHOW_BOT.sh pour voir les logs"
+echo ""
+echo "Utilisez:"
+echo "  ./scripts/SHOW_BOT.sh  - voir les logs du bot"
+echo "  ./scripts/SHOW_WEB.sh  - voir les logs du serveur web"
