@@ -38,30 +38,32 @@ class UserCommandsCog(commands.Cog):
 
     @commands.command(name="profile")
     async def list_profile(self, ctx):
-        """Affiche le profil de l'utilisateur qui exécute la commande."""
+        """Affiche le profil de l'utilisateur qui exécute la commande (version debug)."""
         async with self.bot.db_pool.acquire() as connection:
             query = """
-            SELECT username, discord_name, game_name, language, localisation, latitude, longitude, creation_date, last_connection
+            SELECT username, discord_name, language, localisation, latitude, longitude,
+                   creation_date, last_connection, charte_validated, approval_status
             FROM user_profile
             WHERE username = $1
             """
             user = await connection.fetchrow(query, ctx.author.name)
 
-        if user is None:  # Vérifie si `fetchrow()` a retourné `None`
+        if user is None:
             await ctx.send("❌ Aucun profil trouvé pour vous dans la base de données.")
-            return  # On arrête ici pour éviter un affichage inutile
+            return
 
-        # Construction du message avec des valeurs par défaut si `NULL`
+        # Construction du message
         message = ("\n"
             f"`Username....... : {user['username'] or 'Non renseigné'}`\n"
             f"`Discord Name... : {user['discord_name'] or 'Non renseigné'}`\n"
-            f"`Game Name...... : {user['game_name'] or 'Non renseigné'}`\n"
             f"`Language....... : {user['language'] or 'Non renseigné'}`\n"
             f"`Localisation... : {user['localisation'] or 'Non renseigné'}`\n"
             f"`Latitude....... : {user['latitude'] or 'Non renseigné'}`\n"
             f"`Longitude...... : {user['longitude'] or 'Non renseigné'}`\n"
             f"`Creation Date.. : {user['creation_date'] or 'Non renseigné'}`\n"
             f"`Last Connection : {user['last_connection'] or 'Non renseigné'}`\n"
+            f"`Charte......... : {'Validée' if user['charte_validated'] else 'Non validée'}`\n"
+            f"`Statut......... : {user['approval_status'] or 'pending'}`\n"
         )
         await ctx.send(message)
 

@@ -405,22 +405,23 @@ class RegistrationCog(commands.Cog):
             profile = await UserProfile.get_or_create_user(username, conn, target)
             await profile.load_from_db()
 
+        lang = profile.language
         players = await Player.get_by_member(self.bot.db_pool, username)
 
         embed = discord.Embed(
-            title=f"Profil de {target.display_name}",
+            title=t("profil_cmd.title", lang, name=target.display_name),
             color=discord.Color.blue()
         )
 
         embed.add_field(
-            name="Statut",
+            name=t("profil_cmd.status", lang),
             value=profile.get_status_display(),
             inline=False
         )
 
         embed.add_field(
-            name="Langue",
-            value="🇫🇷 Francais" if profile.language == "fr" else "🇬🇧 English",
+            name=t("profil_cmd.language", lang),
+            value=t("profil_cmd.lang_fr", lang) if profile.language.upper() == "FR" else t("profil_cmd.lang_en", lang),
             inline=True
         )
 
@@ -436,16 +437,16 @@ class RegistrationCog(commands.Cog):
                 names = ", ".join([p.player_name for p in team2_players])
                 embed.add_field(name="This Is PSG 2", value=names, inline=False)
         else:
-            embed.add_field(name="Joueurs", value="Aucun joueur enregistre", inline=False)
+            embed.add_field(name=t("profil_cmd.players", lang), value=t("profil_cmd.no_players", lang), inline=False)
 
         if profile.localisation:
             loc_value = profile.localisation
             if profile.latitude and profile.longitude:
                 loc_value += f"\n📍 {profile.latitude:.4f}, {profile.longitude:.4f}"
-            embed.add_field(name="Localisation", value=loc_value, inline=False)
+            embed.add_field(name=t("profil_cmd.location", lang), value=loc_value, inline=False)
 
         if target == ctx.author:
-            embed.set_footer(text="Utilise !joueur, !localisation pour modifier")
+            embed.set_footer(text=t("profil_cmd.footer", lang))
 
         await ctx.send(embed=embed)
 
@@ -472,7 +473,7 @@ class RegistrationCog(commands.Cog):
                 msg += f"This Is PSG 2 : {', '.join(team2)}\n"
             await ctx.send(msg)
         else:
-            await ctx.send("Aucun joueur enregistre." if lang == "fr" else "No players registered.")
+            await ctx.send(t("commands.no_players", lang))
 
         await ctx.send(t("commands.joueur_public", lang))
 
@@ -487,7 +488,7 @@ class RegistrationCog(commands.Cog):
         username = member.name
 
         await dm_channel.send("═" * 35)
-        title = "🎾 **GESTION DE TES JOUEURS** 🎾" if lang == "fr" else "🎾 **MANAGE YOUR PLAYERS** 🎾"
+        title = "🎾 **GESTION DE TES JOUEURS** 🎾" if lang.upper() == "FR" else "🎾 **MANAGE YOUR PLAYERS** 🎾"
         await dm_channel.send(title)
         await asyncio.sleep(0.5)
 
@@ -505,7 +506,7 @@ class RegistrationCog(commands.Cog):
                 msg += f"- {p.player_name} ({p.team_name})\n"
             await dm_channel.send(msg)
         else:
-            await dm_channel.send("Aucun joueur enregistre." if lang == "fr" else "No players registered.")
+            await dm_channel.send(t("commands.no_players", lang))
 
     @commands.command(name="localisation")
     async def cmd_localisation(self, ctx, *, location: str = None):
@@ -515,13 +516,22 @@ class RegistrationCog(commands.Cog):
         lang = profile.language
 
         if not location:
-            await ctx.send(
-                "**Usage:** `!localisation MaVille`\n"
-                "**Exemples:**\n"
-                "- `!localisation France`\n"
-                "- `!localisation Paris`\n"
-                "- `!localisation 75001 Paris`"
-            )
+            if lang.upper() == "FR":
+                await ctx.send(
+                    "**Usage:** `!localisation MaVille`\n"
+                    "**Exemples:**\n"
+                    "- `!localisation France`\n"
+                    "- `!localisation Paris`\n"
+                    "- `!localisation 75001 Paris`"
+                )
+            else:
+                await ctx.send(
+                    "**Usage:** `!localisation YourCity`\n"
+                    "**Examples:**\n"
+                    "- `!localisation France`\n"
+                    "- `!localisation London`\n"
+                    "- `!localisation 10001 New York`"
+                )
             return
 
         from geopy.geocoders import Nominatim
@@ -566,10 +576,10 @@ class RegistrationCog(commands.Cog):
                 profile = await UserProfile.get_or_create_user(member.name, conn, member)
                 await profile.set_language(view.language)
 
-            if view.language == "fr":
-                await msg.edit(content="Langue definie : 🇫🇷 Francais", view=None)
+            if view.language.upper() == "FR":
+                await msg.edit(content=t("langue_cmd.set_fr", "FR"), view=None)
             else:
-                await msg.edit(content="Language set: 🇬🇧 English", view=None)
+                await msg.edit(content=t("langue_cmd.set_en", "EN"), view=None)
 
 
 # =============================================================================

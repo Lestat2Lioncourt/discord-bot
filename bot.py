@@ -17,6 +17,8 @@ from utils.database import Database
 from utils.logger import get_logger
 from utils.validators import validate_user_id, validate_username
 from utils.debug import debug_only, is_debug_mode
+from utils.i18n import t
+from models.user_profile import UserProfile
 
 # ===============================================================================
 # Initialisations
@@ -126,62 +128,81 @@ async def add_user(ctx, user_id: int, user_name: str):
 async def custom_help(ctx, command_name: str = None):
     """Commande personnalisee pour afficher une aide contextuelle."""
 
-    # Details de toutes les commandes
+    # Recuperer la langue de l'utilisateur
+    lang = "FR"
+    try:
+        async with bot.db_pool.acquire() as conn:
+            profile = await UserProfile.get_or_create_user(ctx.author.name, conn, ctx.author)
+            lang = profile.language or "FR"
+    except Exception:
+        pass
+
+    # Details de toutes les commandes (FR/EN)
     commands_details = {
         # General
         "help": {
-            "desc": "Affiche cette aide.",
-            "usage": "!help [commande]",
+            "desc_fr": "Affiche cette aide.",
+            "desc_en": "Shows this help.",
+            "usage": "!help [command]",
             "aliases": "!aide, !commands"
         },
         "langue": {
-            "desc": "Change ta langue preferee (FR/EN).",
+            "desc_fr": "Change ta langue preferee (FR/EN).",
+            "desc_en": "Change your preferred language (FR/EN).",
             "usage": "!langue",
             "aliases": "!language, !lang"
         },
         # Inscription
         "inscription": {
-            "desc": "Demarre ou reprend le processus d'inscription.",
+            "desc_fr": "Demarre ou reprend le processus d'inscription.",
+            "desc_en": "Start or resume the registration process.",
             "usage": "!inscription",
             "aliases": "-"
         },
         "profil": {
-            "desc": "Affiche ton profil ou celui d'un membre.",
-            "usage": "!profil [@membre]",
+            "desc_fr": "Affiche ton profil ou celui d'un membre.",
+            "desc_en": "Show your profile or another member's.",
+            "usage": "!profil [@member]",
             "aliases": "-"
         },
         "joueur": {
-            "desc": "Affiche tes joueurs et permet d'en ajouter.",
+            "desc_fr": "Affiche tes joueurs et permet d'en ajouter.",
+            "desc_en": "Show your players and add new ones.",
             "usage": "!joueur",
             "aliases": "!player, !joueurs, !players"
         },
         "localisation": {
-            "desc": "Definit ta localisation pour la carte des membres.",
-            "usage": "!localisation <ville ou adresse>",
+            "desc_fr": "Definit ta localisation pour la carte des membres.",
+            "desc_en": "Set your location for the members map.",
+            "usage": "!localisation <city or address>",
             "aliases": "-"
         },
         # Sages
         "pending": {
-            "desc": "Liste les inscriptions en attente de validation.",
+            "desc_fr": "Liste les inscriptions en attente de validation.",
+            "desc_en": "List pending registrations.",
             "usage": "!pending",
             "aliases": "!attente, !inscriptions",
             "sage": True
         },
         "valider": {
-            "desc": "Valide un membre et le promeut en Membre.",
-            "usage": "!valider @membre",
+            "desc_fr": "Valide un membre et le promeut en Membre.",
+            "desc_en": "Approve a member and promote to Member.",
+            "usage": "!valider @member",
             "aliases": "!approve, !accepter",
             "sage": True
         },
         "refuser": {
-            "desc": "Refuse un membre avec une raison optionnelle.",
-            "usage": "!refuser @membre [raison]",
+            "desc_fr": "Refuse un membre avec une raison optionnelle.",
+            "desc_en": "Reject a member with an optional reason.",
+            "usage": "!refuser @member [reason]",
             "aliases": "!refuse, !reject",
             "sage": True
         },
         "profil-admin": {
-            "desc": "Affiche le profil complet d'un membre (vue admin).",
-            "usage": "!profil-admin @membre",
+            "desc_fr": "Affiche le profil complet d'un membre (vue admin).",
+            "desc_en": "Show full member profile (admin view).",
+            "usage": "!profil-admin @member",
             "aliases": "!profile-admin",
             "sage": True
         },
@@ -190,46 +211,33 @@ async def custom_help(ctx, command_name: str = None):
     if command_name is None:
         # Liste complete des commandes
         embed = discord.Embed(
-            title="📚 Commandes disponibles",
-            description="Utilise `!help <commande>` pour plus de details.",
+            title=t("help_cmd.title", lang),
+            description=t("help_cmd.subtitle", lang),
             color=discord.Color.blue()
         )
 
         # Commandes generales
         embed.add_field(
-            name="🌐 General",
-            value=(
-                "`!help` - Affiche cette aide\n"
-                "`!langue` - Change ta langue (FR/EN)"
-            ),
+            name=t("help_cmd.general", lang),
+            value=t("help_cmd.general_list", lang),
             inline=False
         )
 
         # Commandes inscription/profil
         embed.add_field(
-            name="👤 Inscription & Profil",
-            value=(
-                "`!inscription` - Demarre l'inscription\n"
-                "`!profil` - Affiche ton profil\n"
-                "`!joueur` - Gere tes joueurs\n"
-                "`!localisation` - Definit ta position"
-            ),
+            name=t("help_cmd.profile", lang),
+            value=t("help_cmd.profile_list", lang),
             inline=False
         )
 
         # Commandes Sages
         embed.add_field(
-            name="⚖️ Sages (moderateurs)",
-            value=(
-                "`!pending` - Inscriptions en attente\n"
-                "`!valider @user` - Valide un membre\n"
-                "`!refuser @user` - Refuse un membre\n"
-                "`!profil-admin @user` - Profil complet"
-            ),
+            name=t("help_cmd.sages", lang),
+            value=t("help_cmd.sages_list", lang),
             inline=False
         )
 
-        embed.set_footer(text="This Is PSG - Tennis Clash Team")
+        embed.set_footer(text=t("help_cmd.footer", lang))
         await ctx.send(embed=embed)
 
     else:
@@ -237,17 +245,18 @@ async def custom_help(ctx, command_name: str = None):
         cmd = commands_details.get(command_name.lower())
         if cmd:
             embed = discord.Embed(
-                title=f"📖 Commande `!{command_name.lower()}`",
+                title=t("help_cmd.cmd_title", lang, cmd=command_name.lower()),
                 color=discord.Color.green()
             )
-            embed.add_field(name="Description", value=cmd["desc"], inline=False)
-            embed.add_field(name="Usage", value=f"`{cmd['usage']}`", inline=True)
-            embed.add_field(name="Aliases", value=cmd["aliases"], inline=True)
+            desc = cmd["desc_fr"] if lang.upper() == "FR" else cmd["desc_en"]
+            embed.add_field(name=t("help_cmd.description", lang), value=desc, inline=False)
+            embed.add_field(name=t("help_cmd.usage", lang), value=f"`{cmd['usage']}`", inline=True)
+            embed.add_field(name=t("help_cmd.aliases", lang), value=cmd["aliases"], inline=True)
             if cmd.get("sage"):
-                embed.add_field(name="⚠️ Permission", value="Reservee aux Sages", inline=False)
+                embed.add_field(name=t("help_cmd.permission", lang), value=t("help_cmd.sage_only", lang), inline=False)
             await ctx.send(embed=embed)
         else:
-            await ctx.send(f"Commande `{command_name}` non reconnue. Utilise `!help` pour la liste.")
+            await ctx.send(t("help_cmd.unknown_cmd", lang, cmd=command_name))
 
 # ===============================================================================
 # Fonction d'initialisation

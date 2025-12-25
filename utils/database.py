@@ -43,7 +43,7 @@ class Database:
     async def get_member(self, username: str) -> Optional[Dict[str, Any]]:
         """Récupère les informations complètes d'un membre."""
         query = """
-        SELECT username, discord_name, game_name, language, localisation,
+        SELECT username, discord_name, language, localisation,
                latitude, longitude, creation_date, last_connection,
                charte_validated, approval_status
         FROM user_profile

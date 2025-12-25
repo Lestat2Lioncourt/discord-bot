@@ -25,8 +25,7 @@ class UserProfile:
         self.last_connection = last_connection
 
         # Champs existants
-        self.game_name = None  # Deprecated - utiliser players
-        self.language = "fr"  # Langue par defaut
+        self.language = "FR"  # Langue par defaut
         self.localisation = None
         self.latitude = None
         self.longitude = None
@@ -106,7 +105,7 @@ class UserProfile:
     async def load_from_db(self) -> None:
         """Charge les informations complètes depuis la base de données."""
         query = """
-        SELECT game_name, language, localisation, latitude, longitude,
+        SELECT language, localisation, latitude, longitude,
                discord_name, last_connection, creation_date,
                charte_validated, approval_status
         FROM user_profile WHERE username = $1
@@ -114,8 +113,7 @@ class UserProfile:
         try:
             result = await self.db_connection.fetchrow(query, self.username)
             if result:
-                self.game_name = result["game_name"]
-                self.language = result.get("language") or "fr"
+                self.language = result.get("language") or "FR"
                 self.localisation = result["localisation"]
                 self.latitude = result["latitude"]
                 self.longitude = result["longitude"]
@@ -238,6 +236,29 @@ class UserProfile:
         async with db_pool.acquire() as conn:
             rows = await conn.fetch(query)
             return [dict(row) for row in rows]
+
+    @classmethod
+    async def get_by_username(cls, db_connection, username: str) -> Optional['UserProfile']:
+        """Récupère un profil par son username (sans le créer s'il n'existe pas)."""
+        query = """
+        SELECT username, discord_name, last_connection, charte_validated, approval_status, language
+        FROM user_profile WHERE username = $1
+        """
+        row = await db_connection.fetchrow(query, username)
+
+        if not row:
+            return None
+
+        profile = cls(
+            row['username'],
+            db_connection,
+            row['discord_name'],
+            row['last_connection']
+        )
+        profile.charte_validated = row.get('charte_validated', False)
+        profile.approval_status = row.get('approval_status', 'pending')
+        profile.language = row.get('language', 'FR')
+        return profile
 
     def __str__(self) -> str:
         return (

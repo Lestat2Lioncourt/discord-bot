@@ -77,6 +77,70 @@
 
   "commands": {
     "inscription_public": "Je t'envoie les instructions en message prive...",
-    "joueur_public": "Je t'envoie le formulaire d'ajout en message prive..."
+    "joueur_public": "Je t'envoie le formulaire d'ajout en message prive...",
+    "no_players": "Aucun joueur enregistre."
+  },
+
+  "profil_cmd": {
+    "title": "Profil de {name}",
+    "status": "Statut",
+    "language": "Langue",
+    "lang_fr": "🇫🇷 Francais",
+    "lang_en": "🇬🇧 English",
+    "players": "Joueurs",
+    "no_players": "Aucun joueur enregistre",
+    "location": "Localisation",
+    "footer": "Utilise !joueur, !localisation pour modifier"
+  },
+
+  "help_cmd": {
+    "title": "📚 Commandes disponibles",
+    "subtitle": "Utilise `!help <commande>` pour plus de details.",
+    "general": "🌐 General",
+    "general_list": "`!help` - Affiche cette aide\n`!langue` - Change ta langue (FR/EN)",
+    "profile": "👤 Inscription & Profil",
+    "profile_list": "`!inscription` - Demarre l'inscription\n`!profil` - Affiche ton profil\n`!joueur` - Gere tes joueurs\n`!localisation` - Definit ta position",
+    "sages": "⚖️ Sages (moderateurs)",
+    "sages_list": "`!pending` - Inscriptions en attente\n`!valider @user` - Valide un membre\n`!refuser @user` - Refuse un membre\n`!profil-admin @user` - Profil complet",
+    "footer": "This Is PSG - Tennis Clash Team",
+    "cmd_title": "📖 Commande `!{cmd}`",
+    "description": "Description",
+    "usage": "Usage",
+    "aliases": "Aliases",
+    "permission": "⚠️ Permission",
+    "sage_only": "Reservee aux Sages",
+    "unknown_cmd": "Commande `{cmd}` non reconnue. Utilise `!help` pour la liste."
+  },
+
+  "langue_cmd": {
+    "set_fr": "Langue definie : 🇫🇷 Francais",
+    "set_en": "Language set: 🇬🇧 English",
+    "timeout": "Temps ecoule / Time expired."
+  },
+
+  "sages_cmd": {
+    "pending_title": "Inscriptions en attente",
+    "pending_count": "{count} membre(s) en attente",
+    "pending_none": "Aucune inscription en attente.",
+    "pending_footer": "Utilise !valider @user ou !refuser @user [raison]",
+    "pending_players": "Joueurs",
+    "pending_no_players": "Aucun",
+    "already_approved": "{member} est deja approuve.",
+    "charte_not_validated": "{member} n'a pas encore valide la charte.",
+    "validated_success": "{member} a ete valide et promu Membre !",
+    "validated_error": "Erreur lors de la promotion de {member}. Verifie les permissions.",
+    "welcome_public": "🎉 Bienvenue {member} dans la team **{guild}** !\nTa candidature a ete validee. Tu as maintenant acces a tous les salons.",
+    "already_refused": "{member} est deja refuse.",
+    "refused_success": "{member} a ete refuse.",
+    "refused_reason": "Raison: {reason}",
+    "profil_admin_title": "Profil de {name}",
+    "profil_admin_status": "Statut",
+    "profil_admin_roles": "Roles",
+    "profil_admin_no_roles": "Aucun",
+    "profil_admin_players": "Joueurs",
+    "profil_admin_no_players": "Aucun",
+    "profil_admin_location": "Localisation",
+    "profil_admin_registered": "Inscription",
+    "profil_admin_last_seen": "Derniere connexion"
   }
 }

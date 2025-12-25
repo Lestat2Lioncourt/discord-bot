@@ -77,6 +77,70 @@
 
   "commands": {
     "inscription_public": "I'm sending you the instructions in private message...",
-    "joueur_public": "I'm sending you the form in private message..."
+    "joueur_public": "I'm sending you the form in private message...",
+    "no_players": "No players registered."
+  },
+
+  "profil_cmd": {
+    "title": "{name}'s Profile",
+    "status": "Status",
+    "language": "Language",
+    "lang_fr": "🇫🇷 Francais",
+    "lang_en": "🇬🇧 English",
+    "players": "Players",
+    "no_players": "No players registered",
+    "location": "Location",
+    "footer": "Use !joueur, !localisation to edit"
+  },
+
+  "help_cmd": {
+    "title": "📚 Available Commands",
+    "subtitle": "Use `!help <command>` for more details.",
+    "general": "🌐 General",
+    "general_list": "`!help` - Show this help\n`!langue` - Change your language (FR/EN)",
+    "profile": "👤 Registration & Profile",
+    "profile_list": "`!inscription` - Start registration\n`!profil` - Show your profile\n`!joueur` - Manage your players\n`!localisation` - Set your location",
+    "sages": "⚖️ Sages (moderators)",
+    "sages_list": "`!pending` - Pending registrations\n`!valider @user` - Approve a member\n`!refuser @user` - Reject a member\n`!profil-admin @user` - Full profile",
+    "footer": "This Is PSG - Tennis Clash Team",
+    "cmd_title": "📖 Command `!{cmd}`",
+    "description": "Description",
+    "usage": "Usage",
+    "aliases": "Aliases",
+    "permission": "⚠️ Permission",
+    "sage_only": "Sages only",
+    "unknown_cmd": "Command `{cmd}` not found. Use `!help` for the list."
+  },
+
+  "langue_cmd": {
+    "set_fr": "Langue definie : 🇫🇷 Francais",
+    "set_en": "Language set: 🇬🇧 English",
+    "timeout": "Temps ecoule / Time expired."
+  },
+
+  "sages_cmd": {
+    "pending_title": "Pending Registrations",
+    "pending_count": "{count} member(s) pending",
+    "pending_none": "No pending registrations.",
+    "pending_footer": "Use !valider @user or !refuser @user [reason]",
+    "pending_players": "Players",
+    "pending_no_players": "None",
+    "already_approved": "{member} is already approved.",
+    "charte_not_validated": "{member} has not validated the charter yet.",
+    "validated_success": "{member} has been validated and promoted to Member!",
+    "validated_error": "Error promoting {member}. Check permissions.",
+    "welcome_public": "🎉 Welcome {member} to the team **{guild}**!\nYour application has been approved. You now have access to all channels.",
+    "already_refused": "{member} is already refused.",
+    "refused_success": "{member} has been refused.",
+    "refused_reason": "Reason: {reason}",
+    "profil_admin_title": "{name}'s Profile",
+    "profil_admin_status": "Status",
+    "profil_admin_roles": "Roles",
+    "profil_admin_no_roles": "None",
+    "profil_admin_players": "Players",
+    "profil_admin_no_players": "None",
+    "profil_admin_location": "Location",
+    "profil_admin_registered": "Registered",
+    "profil_admin_last_seen": "Last seen"
   }
 }
