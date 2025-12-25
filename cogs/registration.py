@@ -250,8 +250,27 @@ class RegistrationCog(commands.Cog):
 
     async def ask_location(self, member: discord.Member, dm_channel: discord.DMChannel, lang: str):
         """Demande la localisation (optionnel)."""
-        await dm_channel.send(t("location.title", lang))
-        await dm_channel.send(t("location.intro", lang))
+        username = member.name
+
+        # Verifier si une localisation existe deja
+        async with self.bot.db_pool.acquire() as conn:
+            profile = await UserProfile.get_or_create_user(username, conn, member)
+            await profile.load_from_db()
+
+        if profile.localisation:
+            coords = ""
+            if profile.latitude and profile.longitude:
+                coords = f" ({profile.latitude:.4f}, {profile.longitude:.4f})"
+            existing_msg = f"📍 **Localisation actuelle:** {profile.localisation}{coords}\n\n"
+            if lang.upper() == "FR":
+                existing_msg += "Tape `.` pour conserver, ou saisis une nouvelle localisation :"
+            else:
+                existing_msg += "Type `.` to keep, or enter a new location:"
+            await dm_channel.send(t("location.title", lang))
+            await dm_channel.send(existing_msg)
+        else:
+            await dm_channel.send(t("location.title", lang))
+            await dm_channel.send(t("location.intro", lang))
 
         def check(m):
             return m.author == member and isinstance(m.channel, discord.DMChannel)
@@ -263,7 +282,12 @@ class RegistrationCog(commands.Cog):
             if location and location != ".":
                 await self.save_location(member, dm_channel, location, lang)
             else:
-                await dm_channel.send(t("location.skipped", lang))
+                # Conserver la localisation existante ou passer
+                if profile.localisation:
+                    kept_msg = "Localisation conservee." if lang.upper() == "FR" else "Location kept."
+                    await dm_channel.send(kept_msg)
+                else:
+                    await dm_channel.send(t("location.skipped", lang))
                 await self.finish_registration(member, dm_channel, lang)
 
         except asyncio.TimeoutError:
@@ -288,7 +312,8 @@ class RegistrationCog(commands.Cog):
                     profile = await UserProfile.get_or_create_user(username, conn, member)
                     await profile.set_location(location, loc.latitude, loc.longitude)
 
-                await dm_channel.send(t("location.saved", lang, address=loc.address))
+                coords_info = f"\n📍 Coordonnees: {loc.latitude:.4f}, {loc.longitude:.4f}"
+                await dm_channel.send(t("location.saved", lang, address=loc.address) + coords_info)
             else:
                 await dm_channel.send(t("location.not_found", lang))
 
@@ -306,6 +331,11 @@ class RegistrationCog(commands.Cog):
         username = member.name
         self.active_registrations.pop(username, None)
 
+        # Charger le profil complet
+        async with self.bot.db_pool.acquire() as conn:
+            profile = await UserProfile.get_or_create_user(username, conn, member)
+            await profile.load_from_db()
+
         # Compter les joueurs enregistres
         players = await Player.get_by_member(self.bot.db_pool, username)
 
@@ -316,6 +346,14 @@ class RegistrationCog(commands.Cog):
             for p in players:
                 summary += f"- {p.player_name} ({p.team_name or 'N/A'})\n"
             summary += "\n"
+
+        # Ajouter la localisation si presente
+        if profile.localisation:
+            loc_label = "📍 Localisation:" if lang.upper() == "FR" else "📍 Location:"
+            summary += f"{loc_label} {profile.localisation}"
+            if profile.latitude and profile.longitude:
+                summary += f" ({profile.latitude:.4f}, {profile.longitude:.4f})"
+            summary += "\n\n"
 
         summary += t("finish.pending", lang)
 
@@ -377,7 +415,10 @@ class RegistrationCog(commands.Cog):
             embed.add_field(name="Joueurs", value="Aucun joueur enregistre", inline=False)
 
         if profile.localisation:
-            embed.add_field(name="Localisation", value=profile.localisation, inline=False)
+            loc_value = profile.localisation
+            if profile.latitude and profile.longitude:
+                loc_value += f"\n📍 {profile.latitude:.4f}, {profile.longitude:.4f}"
+            embed.add_field(name="Localisation", value=loc_value, inline=False)
 
         if target == ctx.author:
             embed.set_footer(text="Utilise !joueur, !localisation pour modifier")
