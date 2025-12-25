@@ -4,7 +4,7 @@
 
   "welcome": {
     "title": "Welcome **{display_name}**!",
-    "intro": "I will guide you through the registration process to join the team.\nAnswer the following questions.",
+    "intro": "I will guide you through the registration process to join the team.\nAnswer the following questions.\n\n*If a button doesn't respond on first click, just click again.*",
     "already_registered": "You are already registered and validated!"
   },
 

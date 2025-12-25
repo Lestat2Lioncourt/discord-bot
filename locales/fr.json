@@ -4,7 +4,7 @@
 
   "welcome": {
     "title": "Bienvenue **{display_name}** !",
-    "intro": "Je vais te guider dans ton inscription pour rejoindre la team.\nReponds aux questions suivantes.",
+    "intro": "Je vais te guider dans ton inscription pour rejoindre la team.\nReponds aux questions suivantes.\n\n*Si un bouton ne reagit pas au premier clic, reclique dessus.*",
     "already_registered": "Tu es deja inscrit et valide !"
   },
 
