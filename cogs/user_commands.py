@@ -115,7 +115,7 @@ class UserCommandsCog(commands.Cog):
                 date_str = "----/--/-- --:--"
             display = user['discord_name'] or user['username']
             status = status_icons.get(user['approval_status'], "?")
-            user_list += f"{status} {date_str} | {display}\n"
+            user_list += f"{date_str} {status} {display}\n"
         user_list += "```"
 
         embed = discord.Embed(
@@ -123,7 +123,7 @@ class UserCommandsCog(commands.Cog):
             description=user_list,
             color=discord.Color.blue()
         )
-        embed.set_footer(text=f"Page {page + 1}/{total_pages} | ✓=approuvé ⏳=en attente ✗=refusé")
+        embed.set_footer(text=f"Page {page + 1}/{total_pages}")
         return embed
 
     @commands.command(name="db_status")
@@ -314,7 +314,7 @@ class UsersPaginationView(View):
                 date_str = "----/--/-- --:--"
             display = user['discord_name'] or user['username']
             status = status_icons.get(user['approval_status'], "?")
-            user_list += f"{status} {date_str} | {display}\n"
+            user_list += f"{date_str} {status} {display}\n"
         user_list += "```"
 
         embed = discord.Embed(
@@ -322,7 +322,7 @@ class UsersPaginationView(View):
             description=user_list,
             color=discord.Color.blue()
         )
-        embed.set_footer(text=f"Page {self.current_page + 1}/{self.total_pages} | ✓=approuvé ⏳=en attente ✗=refusé")
+        embed.set_footer(text=f"Page {self.current_page + 1}/{self.total_pages}")
         return embed
 
     @discord.ui.button(label="◀ Précédent", style=ButtonStyle.secondary, custom_id="prev")
