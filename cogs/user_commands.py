@@ -10,7 +10,7 @@ import json
 import asyncio
 from datetime import datetime
 
-from config import CHARTE_JSON_PATH, DATA_DIR, TEMP_DIR
+from config import CHARTE_JSON_PATH, DATA_DIR, TEMP_DIR, WEB_URL
 from models.player import Player
 
 logger = get_logger("cogs.user_commands")
@@ -268,12 +268,30 @@ class UserCommandsCog(commands.Cog):
             with open(map_file, "w", encoding="utf-8") as f:
                 f.write(html_content)
 
-            # Envoyer le fichier
-            await ctx.send(
-                f"Carte generee avec **{len(members_data)}** membres localises.\n"
-                "Ouvre le fichier dans ton navigateur pour voir la carte interactive.",
-                file=discord.File(str(map_file), filename="carte_membres.html")
-            )
+            # Envoyer le lien ou le fichier selon la config
+            if WEB_URL:
+                # Serveur web configure -> envoyer le lien
+                carte_url = f"{WEB_URL.rstrip('/')}/carte"
+                embed = discord.Embed(
+                    title="🗺️ Carte des membres",
+                    description=f"**{len(members_data)}** membres localisés",
+                    url=carte_url,
+                    color=discord.Color.blue()
+                )
+                embed.add_field(
+                    name="Ouvrir la carte",
+                    value=f"[Cliquez ici pour voir la carte interactive]({carte_url})",
+                    inline=False
+                )
+                embed.set_footer(text=f"Mise à jour : {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+                await ctx.send(embed=embed)
+            else:
+                # Pas de serveur web -> envoyer le fichier
+                await ctx.send(
+                    f"Carte generee avec **{len(members_data)}** membres localises.\n"
+                    "Ouvre le fichier dans ton navigateur pour voir la carte interactive.",
+                    file=discord.File(str(map_file), filename="carte_membres.html")
+                )
 
             logger.info(f"Carte generee par {ctx.author.name}: {len(members_data)} membres")
 

@@ -99,3 +99,10 @@ ROLE_SAGE_ID = int(os.getenv("ROLE_SAGE_ID", "0"))
 CHANNEL_ACCUEIL_ID = int(os.getenv("CHANNEL_ACCUEIL_ID", "0"))
 CHANNEL_GENERAL_ID = int(os.getenv("CHANNEL_GENERAL_ID", "0"))
 CHANNEL_SAGE_ID = int(os.getenv("CHANNEL_SAGE_ID", "0"))
+
+# =============================================================================
+# Serveur Web
+# =============================================================================
+# URL publique du serveur web (pour les liens Discord)
+# Ex: http://mon-ip:8080 ou https://carte.mondomaine.com
+WEB_URL = os.getenv("WEB_URL", "")
