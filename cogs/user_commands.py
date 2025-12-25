@@ -71,7 +71,6 @@ class UserCommandsCog(commands.Cog):
             users = await connection.fetch("""
                 SELECT last_connection, username, discord_name, approval_status
                 FROM user_profile
-                WHERE approval_status = 'approved'
                 ORDER BY last_connection DESC
             """)
 
@@ -104,15 +103,19 @@ class UserCommandsCog(commands.Cog):
         end = min(start + USERS_PER_PAGE, total)
         page_users = users[start:end]
 
+        # Indicateurs de statut
+        status_icons = {"approved": "✓", "pending": "⏳", "refused": "✗"}
+
         user_list = "```"
         for user in page_users:
             last_conn = user['last_connection']
             if last_conn:
-                date_str = last_conn.strftime('%Y-%m-%d')
+                date_str = last_conn.strftime('%Y-%m-%d %H:%M')
             else:
-                date_str = "----/--/--"
+                date_str = "----/--/-- --:--"
             display = user['discord_name'] or user['username']
-            user_list += f"{date_str} | {display}\n"
+            status = status_icons.get(user['approval_status'], "?")
+            user_list += f"{status} {date_str} | {display}\n"
         user_list += "```"
 
         embed = discord.Embed(
@@ -120,7 +123,7 @@ class UserCommandsCog(commands.Cog):
             description=user_list,
             color=discord.Color.blue()
         )
-        embed.set_footer(text=f"Page {page + 1}/{total_pages}")
+        embed.set_footer(text=f"Page {page + 1}/{total_pages} | ✓=approuvé ⏳=en attente ✗=refusé")
         return embed
 
     @commands.command(name="db_status")
@@ -299,15 +302,19 @@ class UsersPaginationView(View):
         end = min(start + USERS_PER_PAGE, self.total)
         page_users = self.users[start:end]
 
+        # Indicateurs de statut
+        status_icons = {"approved": "✓", "pending": "⏳", "refused": "✗"}
+
         user_list = "```"
         for user in page_users:
             last_conn = user['last_connection']
             if last_conn:
-                date_str = last_conn.strftime('%Y-%m-%d')
+                date_str = last_conn.strftime('%Y-%m-%d %H:%M')
             else:
-                date_str = "----/--/--"
+                date_str = "----/--/-- --:--"
             display = user['discord_name'] or user['username']
-            user_list += f"{date_str} | {display}\n"
+            status = status_icons.get(user['approval_status'], "?")
+            user_list += f"{status} {date_str} | {display}\n"
         user_list += "```"
 
         embed = discord.Embed(
@@ -315,7 +322,7 @@ class UsersPaginationView(View):
             description=user_list,
             color=discord.Color.blue()
         )
-        embed.set_footer(text=f"Page {self.current_page + 1}/{self.total_pages}")
+        embed.set_footer(text=f"Page {self.current_page + 1}/{self.total_pages} | ✓=approuvé ⏳=en attente ✗=refusé")
         return embed
 
     @discord.ui.button(label="◀ Précédent", style=ButtonStyle.secondary, custom_id="prev")
