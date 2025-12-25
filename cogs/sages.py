@@ -27,8 +27,24 @@ logger = get_logger("cogs.sages")
 def sage_only():
     """Decorateur pour limiter une commande aux Sages."""
     async def predicate(ctx):
-        if not is_sage(ctx.author):
-            await ctx.send(t("errors.sage_only", "FR"))  # Default FR, user may not have a profile
+        # En DM, ctx.author est un User sans .roles
+        # On cherche le Member dans les guildes du bot
+        user = ctx.author
+        is_sage_user = False
+
+        if hasattr(user, 'roles'):
+            # Contexte serveur : ctx.author est deja un Member
+            is_sage_user = is_sage(user)
+        else:
+            # Contexte DM : chercher le Member dans les guildes
+            for guild in ctx.bot.guilds:
+                member = guild.get_member(user.id)
+                if member and is_sage(member):
+                    is_sage_user = True
+                    break
+
+        if not is_sage_user:
+            await ctx.send(t("errors.sage_only", "FR"))
             return False
         return True
     return commands.check(predicate)
