@@ -71,12 +71,12 @@ class RegistrationCog(commands.Cog):
         await self.send_charte(member, dm_channel)
 
     async def send_charte(self, member: discord.Member, dm_channel: discord.DMChannel):
-        """Envoie la charte par blocs avec bouton Suivant, validation a la fin."""
+        """Envoie la charte section par section, efface entre chaque."""
         username = member.name
 
-        # Charger et concatener tous les textes
+        # Charger les sections de la charte
         charte_files = ["0_intro", "1_regles_generales", "2_structure_roles", "3_regles_fonctionnement"]
-        full_text = ""
+        sections = []
 
         for key in charte_files:
             if key not in CHARTE_TEXTS:
@@ -86,41 +86,44 @@ class RegistrationCog(commands.Cog):
                 logger.warning(f"Fichier charte introuvable: {file_path}")
                 continue
             with open(file_path, "r", encoding="utf-8") as f:
-                full_text += f.read() + "\n\n"
+                sections.append(f.read().strip())
 
-        # Decouper en blocs lisibles (~1500 chars pour eviter scroll)
-        chunks = []
-        current_chunk = ""
-        for line in full_text.split("\n"):
-            if len(current_chunk) + len(line) + 1 > 1500:
-                chunks.append(current_chunk.strip())
-                current_chunk = line + "\n"
-            else:
-                current_chunk += line + "\n"
-        if current_chunk.strip():
-            chunks.append(current_chunk.strip())
+        # Afficher chaque section, effacer avant la suivante
+        messages_to_delete = []
 
-        # Afficher chaque bloc avec bouton Suivant
-        for i, chunk in enumerate(chunks):
-            await dm_channel.send(chunk)
+        for i, section in enumerate(sections):
+            # Envoyer la section
+            msg = await dm_channel.send(section)
+            messages_to_delete.append(msg)
 
-            # Bouton Suivant sauf pour le dernier bloc
-            if i < len(chunks) - 1:
-                view = NextButtonView(member)
-                await dm_channel.send("─" * 30, view=view)
+            # Bouton Suivant sauf pour la derniere section
+            if i < len(sections) - 1:
+                btn_msg = await dm_channel.send(
+                    f"*Section {i+1}/{len(sections)}*",
+                    view=NextButtonView(member, messages_to_delete.copy())
+                )
+                messages_to_delete.append(btn_msg)
 
+                # Attendre le clic
                 try:
-                    await asyncio.wait_for(view.wait(), timeout=300)
+                    await self.wait_for_next_click(member, timeout=300)
                 except asyncio.TimeoutError:
                     await dm_channel.send("Temps ecoule. Tape `!inscription` pour recommencer.")
                     self.active_registrations.pop(username, None)
                     return
 
+                # Effacer les messages precedents
+                for msg in messages_to_delete:
+                    try:
+                        await msg.delete()
+                    except Exception:
+                        pass
+                messages_to_delete.clear()
+
         # Validation finale
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(0.3)
         view = CharteValidationView(self, member, "final")
         await dm_channel.send(
-            "─" * 30 + "\n"
             "**Acceptes-tu cette charte dans son integralite ?**\n"
             "*En acceptant, tu t'engages a respecter ces regles.*",
             view=view
@@ -153,6 +156,16 @@ class RegistrationCog(commands.Cog):
         # Etape 2: Joueurs Team 1
         self.active_registrations[username] = "team1"
         await self.ask_players_for_team(member, dm_channel, 1, "This Is PSG")
+
+    async def wait_for_next_click(self, member: discord.Member, timeout: int = 300):
+        """Attend que le membre clique sur Suivant."""
+        def check(interaction: discord.Interaction):
+            return (
+                interaction.user == member and
+                interaction.type == discord.InteractionType.component
+            )
+
+        await self.bot.wait_for("interaction", check=check, timeout=timeout)
 
     async def ask_players_for_team(self, member: discord.Member, dm_channel: discord.DMChannel,
                                     team_id: int, team_name: str, is_main_team: bool = True):
@@ -605,36 +618,17 @@ class YesNoView(View):
 class NextButtonView(View):
     """Vue avec bouton Suivant."""
 
-    def __init__(self, member: discord.Member):
+    def __init__(self, member: discord.Member, messages_to_delete: list = None):
         super().__init__(timeout=300)
         self.member = member
-        self.clicked = False
+        self.messages_to_delete = messages_to_delete or []
 
     @discord.ui.button(label="Suivant ➡️", style=ButtonStyle.primary)
     async def next(self, interaction: Interaction, button: Button):
-        # Ignorer si deja clique
-        if self.clicked:
-            await interaction.response.defer()
-            return
+        # Repondre immediatement a Discord
+        await interaction.response.defer()
 
-        if interaction.user != self.member:
-            await interaction.response.defer()
-            return
-
-        self.clicked = True
-
-        try:
-            # Desactiver le bouton visuellement
-            button.disabled = True
-            button.label = "..."
-            await interaction.response.edit_message(view=self)
-        except Exception:
-            try:
-                await interaction.response.defer()
-            except Exception:
-                pass
-
-        self.stop()
+        # Le wait_for("interaction") dans send_charte va capter cet evenement
 
 
 async def setup(bot):
