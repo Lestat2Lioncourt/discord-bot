@@ -19,7 +19,7 @@ from models.player import Player
 from utils.logger import get_logger
 from utils.roles import is_sage, promote_to_membre, demote_to_newbie
 from utils.i18n import t
-from config import CHANNEL_ACCUEIL_ID, CHANNEL_SAGE_ID, DEBUG_MODE, DEBUG_USER
+from config import CHANNEL_GENERAL_ID, CHANNEL_SAGE_ID, DEBUG_MODE, DEBUG_USER
 
 logger = get_logger("cogs.sages")
 
@@ -167,9 +167,9 @@ class SagesCog(commands.Cog):
 
                 guild = member.guild
                 if guild:
-                    accueil_channel = guild.get_channel(CHANNEL_ACCUEIL_ID)
-                    if accueil_channel:
-                        await accueil_channel.send(
+                    general_channel = guild.get_channel(CHANNEL_GENERAL_ID)
+                    if general_channel:
+                        await general_channel.send(
                             t("sages_cmd.welcome_public", member_lang, member=member.mention, guild=guild.name)
                         )
 
@@ -257,9 +257,9 @@ class SagesCog(commands.Cog):
                         break
 
             if guild:
-                accueil_channel = guild.get_channel(CHANNEL_ACCUEIL_ID)
-                if accueil_channel:
-                    await accueil_channel.send(
+                general_channel = guild.get_channel(CHANNEL_GENERAL_ID)
+                if general_channel:
+                    await general_channel.send(
                         t("sages_cmd.welcome_public", member_lang, member=member.mention, guild=guild.name)
                     )
 

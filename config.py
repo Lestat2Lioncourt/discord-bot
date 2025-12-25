@@ -97,4 +97,5 @@ ROLE_SAGE_ID = int(os.getenv("ROLE_SAGE_ID", "0"))
 # Discord Channel IDs
 # =============================================================================
 CHANNEL_ACCUEIL_ID = int(os.getenv("CHANNEL_ACCUEIL_ID", "0"))
+CHANNEL_GENERAL_ID = int(os.getenv("CHANNEL_GENERAL_ID", "0"))
 CHANNEL_SAGE_ID = int(os.getenv("CHANNEL_SAGE_ID", "0"))
