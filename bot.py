@@ -177,6 +177,12 @@ async def custom_help(ctx, command_name: str = None):
             "usage": "!localisation <city or address>",
             "aliases": "-"
         },
+        "users": {
+            "desc_fr": "Liste tous les membres enregistres.",
+            "desc_en": "List all registered members.",
+            "usage": "!users",
+            "aliases": "!utilisateurs"
+        },
         # Sages
         "pending": {
             "desc_fr": "Liste les inscriptions en attente de validation.",

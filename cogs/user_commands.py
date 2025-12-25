@@ -1,5 +1,7 @@
 import discord
 from discord.ext import commands
+from discord import ButtonStyle, Interaction
+from discord.ui import Button, View
 from utils.image_processing import process_image
 from utils.logger import get_logger
 from utils.database import Database
@@ -11,6 +13,8 @@ from datetime import datetime
 from config import CHARTE_JSON_PATH, DATA_DIR, TEMP_DIR
 
 logger = get_logger("cogs.user_commands")
+
+USERS_PER_PAGE = 20
 
 
 class UserCommandsCog(commands.Cog):
@@ -24,17 +28,6 @@ class UserCommandsCog(commands.Cog):
         with open(CHARTE_JSON_PATH, "r", encoding="utf-8") as f:
             self.charte = json.load(f)
 
-    @commands.command()
-    async def hello(self, ctx):
-        """Commande pour dire bonjour."""
-        await ctx.send("Bonjour ! Je suis en ligne.")
-
-    @commands.command()
-    async def charte(self, ctx):
-        """Affiche la charte de la team."""
-        await ctx.send("""
-        **This is PSG** est une team cool mais ambitieuse.
-        """)
 
     @commands.command(name="profile")
     async def list_profile(self, ctx):
@@ -67,36 +60,64 @@ class UserCommandsCog(commands.Cog):
         )
         await ctx.send(message)
 
-    @commands.command(name="users", aliases=["utilisateurs"])
+    @commands.command(name="users", aliases=["utilisateurs", "membres"])
     async def list_users(self, ctx):
-        """Affiche la liste des utilisateurs enregistrés dans la base de données."""
+        """Affiche la liste des utilisateurs enregistrés avec pagination."""
         async with self.bot.db_pool.acquire() as connection:
-            users = await connection.fetch("""SELECT creation_date, 
-                                                     last_connection, 
-                                                     username, 
-                                                     discord_name 
-                                              FROM   user_profile
-                                            ORDER BY last_connection DESC """)
+            users = await connection.fetch("""
+                SELECT last_connection, username, discord_name, approval_status
+                FROM user_profile
+                WHERE approval_status = 'approved'
+                ORDER BY last_connection DESC
+            """)
 
-        if users:
-            user_list = "```"
-            for user in users:
-                user_list += f"{user['last_connection'].strftime('%Y-%m-%d %H:%M')} - {user['username']} ({user['discord_name']})\n"
-            user_list += "```"
-            
+        if not users:
             embed = discord.Embed(
-                title="📜 Liste des utilisateurs enregistrés",
-                description=user_list,
-                color=discord.Color.blue()
-            )
-            logger.debug(f"Liste utilisateurs: {len(users)} résultats")
-        else:
-            embed = discord.Embed(
-                title="📜 Liste des utilisateurs enregistrés",
-                description="Aucun utilisateur trouvé en base.",
+                title="📜 Liste des membres",
+                description="Aucun membre trouvé.",
                 color=discord.Color.red()
             )
-        await ctx.send(embed=embed)
+            await ctx.send(embed=embed)
+            return
+
+        # Convertir en liste de dicts
+        users_list = [dict(u) for u in users]
+        total = len(users_list)
+        total_pages = (total + USERS_PER_PAGE - 1) // USERS_PER_PAGE
+
+        # Créer l'embed pour la première page
+        embed = self._create_users_embed(users_list, 0, total, total_pages)
+
+        if total_pages <= 1:
+            await ctx.send(embed=embed)
+        else:
+            view = UsersPaginationView(users_list, total, total_pages, ctx.author)
+            view.message = await ctx.send(embed=embed, view=view)
+
+    def _create_users_embed(self, users: list, page: int, total: int, total_pages: int) -> discord.Embed:
+        """Crée l'embed pour une page de la liste des utilisateurs."""
+        start = page * USERS_PER_PAGE
+        end = min(start + USERS_PER_PAGE, total)
+        page_users = users[start:end]
+
+        user_list = "```"
+        for user in page_users:
+            last_conn = user['last_connection']
+            if last_conn:
+                date_str = last_conn.strftime('%Y-%m-%d')
+            else:
+                date_str = "----/--/--"
+            display = user['discord_name'] or user['username']
+            user_list += f"{date_str} | {display}\n"
+        user_list += "```"
+
+        embed = discord.Embed(
+            title=f"📜 Membres ({total})",
+            description=user_list,
+            color=discord.Color.blue()
+        )
+        embed.set_footer(text=f"Page {page + 1}/{total_pages}")
+        return embed
 
     @commands.command(name="db_status")
     async def db_status(self, ctx):
@@ -117,9 +138,9 @@ class UserCommandsCog(commands.Cog):
             )
         await ctx.send(embed=embed)
 
-    @commands.command(name="pseudo")
-    async def update_pseudo(self, ctx, new_pseudo: str):
-        """Permet à un utilisateur de modifier son display_name."""
+    @commands.command(name="pseudo", aliases=["nickname", "nick"])
+    async def update_pseudo(self, ctx, *, new_pseudo: str):
+        """Permet à un utilisateur de modifier son pseudo Discord."""
         # Validation du pseudo
         is_valid, error = validate_pseudo(new_pseudo)
         if not is_valid:
@@ -127,6 +148,17 @@ class UserCommandsCog(commands.Cog):
             return
 
         try:
+            # Mettre à jour le pseudo Discord sur le serveur
+            if ctx.guild:
+                member = ctx.guild.get_member(ctx.author.id)
+                if member:
+                    try:
+                        await member.edit(nick=new_pseudo)
+                    except discord.Forbidden:
+                        await ctx.send("Je n'ai pas la permission de changer ton pseudo sur ce serveur.")
+                        return
+
+            # Mettre à jour en base de données
             async with self.bot.db_pool.acquire() as connection:
                 query = """
                 UPDATE user_profile
@@ -135,7 +167,7 @@ class UserCommandsCog(commands.Cog):
                 """
                 await connection.execute(query, new_pseudo, ctx.author.name)
 
-            await ctx.send(f"Votre pseudo a été mis à jour en `{new_pseudo}`.")
+            await ctx.send(f"Pseudo mis à jour : `{new_pseudo}`")
             logger.info(f"{ctx.author.name} a changé son pseudo en '{new_pseudo}'")
         except Exception as e:
             logger.error(f"Erreur mise à jour pseudo: {e}")
@@ -174,54 +206,78 @@ class UserCommandsCog(commands.Cog):
             logger.error(f"Erreur traitement template: {e}")
             await ctx.send("Erreur lors du traitement de l'image.")
 
-    @commands.command(name="validate_charte")
-    async def validate_charte(self, ctx):
-        """Gère le processus de validation manuelle de la charte."""
-        username = str(ctx.author.name)
 
-        # Récupérer le nombre total de clauses et les validations de l'utilisateur
-        total_clauses = await self.db.get_total_clauses()
-        user_validations = await self.db.get_user_validations(username)
-        validated_clause_ids = [clause_idx for clause_idx, validation in user_validations if validation == 1]
+class UsersPaginationView(View):
+    """Vue pour la pagination de la liste des utilisateurs."""
 
-        # Vérifier si l'utilisateur a déjà validé toutes les clauses
-        if await self.db.is_fully_validated(username, total_clauses):
-            await ctx.send("Vous avez déjà validé toutes les clauses de la charte. Vous êtes membre !")
+    def __init__(self, users: list, total: int, total_pages: int, author):
+        super().__init__(timeout=120)
+        self.users = users
+        self.total = total
+        self.total_pages = total_pages
+        self.author = author
+        self.current_page = 0
+        self.message = None
+        self._update_buttons()
+
+    def _update_buttons(self):
+        """Met à jour l'état des boutons selon la page actuelle."""
+        self.prev_btn.disabled = self.current_page == 0
+        self.next_btn.disabled = self.current_page >= self.total_pages - 1
+
+    def _create_embed(self) -> discord.Embed:
+        """Crée l'embed pour la page actuelle."""
+        start = self.current_page * USERS_PER_PAGE
+        end = min(start + USERS_PER_PAGE, self.total)
+        page_users = self.users[start:end]
+
+        user_list = "```"
+        for user in page_users:
+            last_conn = user['last_connection']
+            if last_conn:
+                date_str = last_conn.strftime('%Y-%m-%d')
+            else:
+                date_str = "----/--/--"
+            display = user['discord_name'] or user['username']
+            user_list += f"{date_str} | {display}\n"
+        user_list += "```"
+
+        embed = discord.Embed(
+            title=f"📜 Membres ({self.total})",
+            description=user_list,
+            color=discord.Color.blue()
+        )
+        embed.set_footer(text=f"Page {self.current_page + 1}/{self.total_pages}")
+        return embed
+
+    @discord.ui.button(label="◀ Précédent", style=ButtonStyle.secondary, custom_id="prev")
+    async def prev_btn(self, interaction: Interaction, button: Button):
+        if interaction.user != self.author:
+            await interaction.response.defer()
             return
+        self.current_page = max(0, self.current_page - 1)
+        self._update_buttons()
+        await interaction.response.edit_message(embed=self._create_embed(), view=self)
 
-        await ctx.send(f"**Il vous reste {total_clauses - len(validated_clause_ids)} clause(s) à valider.**")
+    @discord.ui.button(label="Suivant ▶", style=ButtonStyle.primary, custom_id="next")
+    async def next_btn(self, interaction: Interaction, button: Button):
+        if interaction.user != self.author:
+            await interaction.response.defer()
+            return
+        self.current_page = min(self.total_pages - 1, self.current_page + 1)
+        self._update_buttons()
+        await interaction.response.edit_message(embed=self._create_embed(), view=self)
 
-        # Afficher les clauses non validées une par une
-        for clause in self.charte["charte"]:
-            if clause["idx"] not in validated_clause_ids and clause["validation"] == 1:
-                clause_path = DATA_DIR / clause["path"].replace("data/", "")
-                with open(clause_path, "r", encoding="utf-8") as f:
-                    content = f.read()
+    async def on_timeout(self):
+        """Désactive les boutons après timeout."""
+        if self.message:
+            try:
+                self.prev_btn.disabled = True
+                self.next_btn.disabled = True
+                await self.message.edit(view=self)
+            except Exception:
+                pass
 
-                await ctx.send(f"**Clause {clause['idx']} - {clause['name']}:**\n{content}")
-                await ctx.send("Tapez **OK** pour accepter ou **KO** pour refuser.")
-
-                def check(m):
-                    return m.author == ctx.author and m.channel == ctx.channel and m.content.lower() in ["ok", "ko"]
-
-                try:
-                    response = await self.bot.wait_for("message", check=check, timeout=120.0)
-                except asyncio.TimeoutError:
-                    await ctx.send("Temps écoulé (2 min). Utilisez `!validate_charte` pour reprendre.")
-                    return
-
-                if response.content.lower() == "ok":
-                    await self.db.add_validation(username, clause["idx"], 1)
-                    await ctx.send("Clause acceptée !")
-                    logger.info(f"{username} a accepté la clause {clause['idx']}")
-                else:
-                    await self.db.add_validation(username, clause["idx"], 0)
-                    await ctx.send("Clause refusée.")
-                    logger.info(f"{username} a refusé la clause {clause['idx']}")
-
-        # Vérification finale
-        if await self.db.is_fully_validated(username, total_clauses):
-            await ctx.send("Bravo ! Vous avez validé toutes les clauses. Bienvenue dans la team !")
 
 async def setup(bot):
     """Ajoute le cog au bot."""
