@@ -103,8 +103,8 @@ class UserCommandsCog(commands.Cog):
         end = min(start + USERS_PER_PAGE, total)
         page_users = users[start:end]
 
-        # Indicateurs de statut
-        status_icons = {"approved": "✓", "pending": "⏳", "refused": "✗"}
+        # Indicateurs de statut (caracteres fixes pour alignement)
+        status_icons = {"approved": "[V]", "pending": "[A]", "refused": "[R]"}
 
         user_list = "```"
         for user in page_users:
@@ -114,7 +114,7 @@ class UserCommandsCog(commands.Cog):
             else:
                 date_str = "----/--/-- --:--"
             display = user['discord_name'] or user['username']
-            status = status_icons.get(user['approval_status'], "?")
+            status = status_icons.get(user['approval_status'], "[?]")
             user_list += f"{date_str} {status} {display}\n"
         user_list += "```"
 
@@ -123,7 +123,7 @@ class UserCommandsCog(commands.Cog):
             description=user_list,
             color=discord.Color.blue()
         )
-        embed.set_footer(text=f"Page {page + 1}/{total_pages}")
+        embed.set_footer(text=f"Page {page + 1}/{total_pages} • V=Validé A=Attente R=Refusé")
         return embed
 
     @commands.command(name="db_status")
@@ -302,8 +302,8 @@ class UsersPaginationView(View):
         end = min(start + USERS_PER_PAGE, self.total)
         page_users = self.users[start:end]
 
-        # Indicateurs de statut
-        status_icons = {"approved": "✓", "pending": "⏳", "refused": "✗"}
+        # Indicateurs de statut (caracteres fixes pour alignement)
+        status_icons = {"approved": "[V]", "pending": "[A]", "refused": "[R]"}
 
         user_list = "```"
         for user in page_users:
@@ -313,7 +313,7 @@ class UsersPaginationView(View):
             else:
                 date_str = "----/--/-- --:--"
             display = user['discord_name'] or user['username']
-            status = status_icons.get(user['approval_status'], "?")
+            status = status_icons.get(user['approval_status'], "[?]")
             user_list += f"{date_str} {status} {display}\n"
         user_list += "```"
 
@@ -322,7 +322,7 @@ class UsersPaginationView(View):
             description=user_list,
             color=discord.Color.blue()
         )
-        embed.set_footer(text=f"Page {self.current_page + 1}/{self.total_pages}")
+        embed.set_footer(text=f"Page {self.current_page + 1}/{self.total_pages} • V=Validé A=Attente R=Refusé")
         return embed
 
     @discord.ui.button(label="◀ Précédent", style=ButtonStyle.secondary, custom_id="prev")
