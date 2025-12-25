@@ -121,55 +121,31 @@ class SagesCog(commands.Cog):
 
         await self._validate_member(ctx, member, sage_lang)
 
-    async def _validate_member(self, ctx_or_interaction, member: discord.Member, sage_lang: str, sage: discord.Member = None):
-        """Logique de validation d'un membre (utilisable par commande ou bouton)."""
-        is_interaction = isinstance(ctx_or_interaction, Interaction)
-        sage = sage or (ctx_or_interaction.user if is_interaction else ctx_or_interaction.author)
+    async def _do_validate(self, interaction: Interaction, member: discord.Member):
+        """Validation depuis un bouton (interaction deja repondue)."""
+        sage = interaction.user
         username = member.name
 
         async with self.bot.db_pool.acquire() as conn:
             profile = await UserProfile.get_or_create_user(username, conn, member)
             member_lang = profile.language or "FR"
 
-            # Verifier que le membre est bien en attente
             if profile.approval_status == "approved":
-                msg = t("sages_cmd.already_approved", sage_lang, member=member.mention)
-                if is_interaction:
-                    await ctx_or_interaction.response.send_message(msg, ephemeral=True)
-                else:
-                    await ctx_or_interaction.send(msg)
-                return False
+                await interaction.followup.send(f"{member.mention} est deja approuve.", ephemeral=True)
+                return
 
             if not profile.charte_validated:
-                msg = t("sages_cmd.charte_not_validated", sage_lang, member=member.mention)
-                if is_interaction:
-                    await ctx_or_interaction.response.send_message(msg, ephemeral=True)
-                else:
-                    await ctx_or_interaction.send(msg)
-                return False
+                await interaction.followup.send(f"{member.mention} n'a pas valide la charte.", ephemeral=True)
+                return
 
-            # Approuver
             await profile.approve()
 
-        # Promouvoir (Newbie -> Membre)
         success = await promote_to_membre(member)
 
         if success:
-            msg = t("sages_cmd.validated_success", sage_lang, member=member.mention)
-            if is_interaction:
-                await ctx_or_interaction.response.send_message(msg)
-            else:
-                await ctx_or_interaction.send(msg)
+            await interaction.followup.send(f"{member.mention} a ete valide!")
 
-            # Trouver le guild pour le message d'accueil
-            guild = member.guild if hasattr(member, 'guild') else None
-            if not guild:
-                for g in self.bot.guilds:
-                    if g.get_member(member.id):
-                        guild = g
-                        break
-
-            # Message de bienvenue public dans le canal d'accueil
+            guild = member.guild
             if guild:
                 accueil_channel = guild.get_channel(CHANNEL_ACCUEIL_ID)
                 if accueil_channel:
@@ -177,7 +153,80 @@ class SagesCog(commands.Cog):
                         t("sages_cmd.welcome_public", member_lang, member=member.mention, guild=guild.name)
                     )
 
-            # Notifier le membre en DM
+            try:
+                await member.send(t("finish.approved", member_lang, sage_name=sage.display_name))
+            except discord.Forbidden:
+                pass
+
+            logger.info(f"{username} valide par {sage.name} (bouton)")
+        else:
+            await interaction.followup.send(f"Erreur lors de la promotion de {member.mention}.", ephemeral=True)
+
+    async def _do_refuse(self, interaction: Interaction, member: discord.Member):
+        """Refus depuis un bouton (interaction deja repondue)."""
+        sage = interaction.user
+        username = member.name
+
+        async with self.bot.db_pool.acquire() as conn:
+            profile = await UserProfile.get_or_create_user(username, conn, member)
+            member_lang = profile.language or "FR"
+
+            if profile.approval_status == "refused":
+                await interaction.followup.send(f"{member.mention} est deja refuse.", ephemeral=True)
+                return
+
+            await profile.refuse()
+
+        await demote_to_newbie(member)
+        await interaction.followup.send(f"{member.mention} a ete refuse.")
+
+        try:
+            dm_msg = t("finish.refused", member_lang)
+            dm_msg += "\n\n" + t("finish.refused_contact", member_lang)
+            await member.send(dm_msg)
+        except discord.Forbidden:
+            pass
+
+        logger.info(f"{username} refuse par {sage.name} (bouton)")
+
+    async def _validate_member(self, ctx, member: discord.Member, sage_lang: str, sage: discord.Member = None):
+        """Logique de validation d'un membre (commande uniquement)."""
+        sage = sage or ctx.author
+        username = member.name
+
+        async with self.bot.db_pool.acquire() as conn:
+            profile = await UserProfile.get_or_create_user(username, conn, member)
+            member_lang = profile.language or "FR"
+
+            if profile.approval_status == "approved":
+                await ctx.send(t("sages_cmd.already_approved", sage_lang, member=member.mention))
+                return False
+
+            if not profile.charte_validated:
+                await ctx.send(t("sages_cmd.charte_not_validated", sage_lang, member=member.mention))
+                return False
+
+            await profile.approve()
+
+        success = await promote_to_membre(member)
+
+        if success:
+            await ctx.send(t("sages_cmd.validated_success", sage_lang, member=member.mention))
+
+            guild = member.guild if hasattr(member, 'guild') else None
+            if not guild:
+                for g in self.bot.guilds:
+                    if g.get_member(member.id):
+                        guild = g
+                        break
+
+            if guild:
+                accueil_channel = guild.get_channel(CHANNEL_ACCUEIL_ID)
+                if accueil_channel:
+                    await accueil_channel.send(
+                        t("sages_cmd.welcome_public", member_lang, member=member.mention, guild=guild.name)
+                    )
+
             try:
                 await member.send(t("finish.approved", member_lang, sage_name=sage.display_name))
             except discord.Forbidden:
@@ -186,11 +235,7 @@ class SagesCog(commands.Cog):
             logger.info(f"{username} valide par {sage.name}")
             return True
         else:
-            msg = t("sages_cmd.validated_error", sage_lang, member=member.mention)
-            if is_interaction:
-                await ctx_or_interaction.response.send_message(msg, ephemeral=True)
-            else:
-                await ctx_or_interaction.send(msg)
+            await ctx.send(t("sages_cmd.validated_error", sage_lang, member=member.mention))
             return False
 
     @commands.command(name="refuser", aliases=["refuse", "reject"])
@@ -271,8 +316,11 @@ class SagesCog(commands.Cog):
     @sage_only()
     async def cmd_check_users(self, ctx):
         """Envoie les notifications pour tous les utilisateurs en attente de validation."""
+        logger.info(f"check_users lance par {ctx.author.name}")
+
         # Recuperer les membres en attente
         pending = await UserProfile.get_pending_members(self.bot.db_pool)
+        logger.info(f"check_users: {len(pending)} membre(s) en attente trouve(s)")
 
         if not pending:
             await ctx.send("Aucun membre en attente de validation.")
@@ -281,43 +329,54 @@ class SagesCog(commands.Cog):
         await ctx.send(f"Envoi des notifications pour **{len(pending)}** membre(s) en attente...")
 
         count = 0
+        errors = 0
         for member_data in pending:
-            username = member_data['username']
-            discord_id = member_data.get('discord_id')
+            try:
+                username = member_data['username']
+                discord_id = member_data.get('discord_id')
 
-            # Trouver le membre Discord
-            member = None
-            for guild in self.bot.guilds:
-                if discord_id:
-                    member = guild.get_member(discord_id)
+                # Trouver le membre Discord
+                member = None
+                for guild in self.bot.guilds:
+                    if discord_id:
+                        member = guild.get_member(discord_id)
+                    if not member:
+                        member = discord.utils.find(
+                            lambda m: m.name.lower() == username.lower(),
+                            guild.members
+                        )
+                    if member:
+                        break
+
                 if not member:
-                    member = discord.utils.find(
-                        lambda m: m.name.lower() == username.lower(),
-                        guild.members
-                    )
-                if member:
-                    break
+                    logger.warning(f"check_users: Membre {username} non trouve sur le serveur")
+                    errors += 1
+                    continue
 
-            if not member:
-                logger.warning(f"Membre {username} non trouve sur le serveur")
-                continue
+                # Charger le profil et les joueurs
+                async with self.bot.db_pool.acquire() as conn:
+                    profile = await UserProfile.get_or_create_user(username, conn, member)
+                    await profile.load_from_db()
 
-            # Charger le profil et les joueurs
-            async with self.bot.db_pool.acquire() as conn:
-                profile = await UserProfile.get_or_create_user(username, conn, member)
-                await profile.load_from_db()
+                players = await Player.get_by_member(self.bot.db_pool, username)
 
-            players = await Player.get_by_member(self.bot.db_pool, username)
+                # Envoyer la notification
+                await notify_sages_new_registration(self.bot, member, profile, players)
+                count += 1
+                logger.debug(f"check_users: notification envoyee pour {username}")
 
-            # Envoyer la notification
-            await notify_sages_new_registration(self.bot, member, profile, players)
-            count += 1
+                # Petit delai pour eviter le rate limiting
+                await asyncio.sleep(0.5)
 
-            # Petit delai pour eviter le rate limiting
-            await asyncio.sleep(0.5)
+            except Exception as e:
+                logger.error(f"check_users: erreur pour {member_data.get('username', '?')}: {e}")
+                errors += 1
 
-        await ctx.send(f"**{count}** notification(s) envoyee(s).")
-        logger.info(f"check_users: {count} notifications envoyees par {ctx.author.name}")
+        result_msg = f"**{count}** notification(s) envoyee(s)."
+        if errors:
+            result_msg += f" ({errors} erreur(s))"
+        await ctx.send(result_msg)
+        logger.info(f"check_users: {count} notifications, {errors} erreurs - par {ctx.author.name}")
 
     @commands.command(name="profil-admin", aliases=["profile-admin"])
     async def cmd_profil_admin(self, ctx, *, search: str = None):
@@ -473,11 +532,19 @@ class SagesCog(commands.Cog):
 class ValidationView(View):
     """Vue avec boutons Valider/Refuser pour les notifications aux Sages."""
 
-    def __init__(self, bot, member: discord.Member, username: str):
+    def __init__(self, bot, member_id: int, username: str):
         super().__init__(timeout=None)  # Pas de timeout pour les boutons persistants
         self.bot = bot
-        self.member = member
+        self.member_id = member_id
         self.username = username
+
+    def _get_member(self) -> Optional[discord.Member]:
+        """Retrouve le membre Discord par son ID."""
+        for guild in self.bot.guilds:
+            member = guild.get_member(self.member_id)
+            if member:
+                return member
+        return None
 
     @discord.ui.button(label="Valider", style=ButtonStyle.success, emoji="✅")
     async def validate_btn(self, interaction: Interaction, button: Button):
@@ -486,15 +553,21 @@ class ValidationView(View):
             await interaction.response.send_message("Seuls les Sages peuvent valider.", ephemeral=True)
             return
 
+        member = self._get_member()
+        if not member:
+            await interaction.response.send_message(f"Membre {self.username} non trouve sur le serveur.", ephemeral=True)
+            return
+
+        # Desactiver les boutons immediatement
+        self.validate_btn.disabled = True
+        self.refuse_btn.disabled = True
+        await interaction.response.edit_message(view=self)
+
         # Recuperer le cog pour utiliser _validate_member
         cog = self.bot.get_cog("SagesCog")
         if cog:
-            success = await cog._validate_member(interaction, self.member, "FR", interaction.user)
-            if success:
-                # Desactiver les boutons
-                self.validate_btn.disabled = True
-                self.refuse_btn.disabled = True
-                await interaction.message.edit(view=self)
+            # Utiliser un contexte factice pour la validation
+            await cog._do_validate(interaction, member)
 
     @discord.ui.button(label="Refuser", style=ButtonStyle.danger, emoji="❌")
     async def refuse_btn(self, interaction: Interaction, button: Button):
@@ -503,19 +576,26 @@ class ValidationView(View):
             await interaction.response.send_message("Seuls les Sages peuvent refuser.", ephemeral=True)
             return
 
+        member = self._get_member()
+        if not member:
+            await interaction.response.send_message(f"Membre {self.username} non trouve sur le serveur.", ephemeral=True)
+            return
+
+        # Desactiver les boutons immediatement
+        self.validate_btn.disabled = True
+        self.refuse_btn.disabled = True
+        await interaction.response.edit_message(view=self)
+
         # Recuperer le cog pour utiliser _refuse_member
         cog = self.bot.get_cog("SagesCog")
         if cog:
-            success = await cog._refuse_member(interaction, self.member, "FR", None, interaction.user)
-            if success:
-                # Desactiver les boutons
-                self.validate_btn.disabled = True
-                self.refuse_btn.disabled = True
-                await interaction.message.edit(view=self)
+            await cog._do_refuse(interaction, member)
 
 
 async def notify_sages_new_registration(bot, member: discord.Member, profile, players: list):
     """Envoie une notification aux Sages quand un membre termine son inscription."""
+    logger.debug(f"notify_sages_new_registration appelé pour {member.name} (DEBUG_MODE={DEBUG_MODE})")
+
     # Construire l'embed
     embed = discord.Embed(
         title="📋 Nouvelle inscription",
@@ -539,7 +619,7 @@ async def notify_sages_new_registration(bot, member: discord.Member, profile, pl
         embed.add_field(name="Localisation", value=profile.localisation, inline=False)
 
     # Creer la vue avec boutons
-    view = ValidationView(bot, member, member.name)
+    view = ValidationView(bot, member.id, member.name)
 
     # Determiner ou envoyer
     if DEBUG_MODE:
