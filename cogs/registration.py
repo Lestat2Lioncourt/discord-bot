@@ -608,16 +608,32 @@ class NextButtonView(View):
     def __init__(self, member: discord.Member):
         super().__init__(timeout=300)
         self.member = member
+        self.clicked = False
 
-    @discord.ui.button(label="Suivant", style=ButtonStyle.primary, emoji="➡️")
+    @discord.ui.button(label="Suivant ➡️", style=ButtonStyle.primary)
     async def next(self, interaction: Interaction, button: Button):
-        await interaction.response.defer()
-        if interaction.user != self.member:
+        # Ignorer si deja clique
+        if self.clicked:
+            await interaction.response.defer()
             return
+
+        if interaction.user != self.member:
+            await interaction.response.defer()
+            return
+
+        self.clicked = True
+
         try:
-            await interaction.message.edit(content="─" * 30, view=None)
+            # Desactiver le bouton visuellement
+            button.disabled = True
+            button.label = "..."
+            await interaction.response.edit_message(view=self)
         except Exception:
-            pass
+            try:
+                await interaction.response.defer()
+            except Exception:
+                pass
+
         self.stop()
 
 
