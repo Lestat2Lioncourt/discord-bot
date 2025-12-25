@@ -241,16 +241,17 @@ class UserCommandsCog(commands.Cog):
                 username = row['username']
                 display_name = row['discord_name'] or username
 
-                # Recuperer les joueurs de ce membre
+                # Recuperer les joueurs de ce membre, separes par equipe
                 players = await Player.get_by_member(self.bot.db_pool, username)
-                player_names = [p.player_name for p in players] if players else []
+                team1 = [p.player_name for p in players if p.team_name == "This Is PSG"] if players else []
+                team2 = [p.player_name for p in players if p.team_name == "This Is PSG 2"] if players else []
 
                 members_data.append({
                     "name": display_name,
-                    "location": row['localisation'] or "",
                     "lat": float(row['latitude']),
                     "lng": float(row['longitude']),
-                    "players": player_names
+                    "team1": team1,
+                    "team2": team2
                 })
 
             # Lire le template

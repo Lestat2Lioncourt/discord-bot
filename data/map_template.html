@@ -86,16 +86,23 @@
         // Ajouter les marqueurs
         members.forEach(member => {
             let popupContent = `<div class="member-popup">
-                <h3>${member.name}</h3>
-                <div class="location">${member.location}</div>`;
+                <h3>${member.name}</h3>`;
 
-            if (member.players && member.players.length > 0) {
-                popupContent += `<div class="players"><strong>Joueurs:</strong> ${member.players.join(', ')}</div>`;
+            // Joueurs par equipe
+            if (member.team1 && member.team1.length > 0) {
+                popupContent += `<div class="players"><strong>This Is PSG:</strong> ${member.team1.join(', ')}</div>`;
+            }
+            if (member.team2 && member.team2.length > 0) {
+                popupContent += `<div class="players"><strong>This Is PSG 2:</strong> ${member.team2.join(', ')}</div>`;
             }
             popupContent += '</div>';
 
             const marker = L.marker([member.lat, member.lng], { icon: memberIcon })
                 .bindPopup(popupContent);
+
+            // Afficher le popup au survol
+            marker.on('mouseover', function() { this.openPopup(); });
+
             markers.addLayer(marker);
         });
 
