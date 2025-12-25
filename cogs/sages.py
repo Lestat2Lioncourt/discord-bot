@@ -15,6 +15,7 @@ from models.user_profile import UserProfile
 from models.player import Player
 from utils.logger import get_logger
 from utils.roles import is_sage, promote_to_membre, demote_to_newbie
+from config import CHANNEL_ACCUEIL_ID
 
 logger = get_logger("cogs.sages")
 
@@ -94,6 +95,14 @@ class SagesCog(commands.Cog):
 
         if success:
             await ctx.send(f"{member.mention} a ete valide et promu Membre !")
+
+            # Message de bienvenue public dans le canal d'accueil
+            accueil_channel = ctx.guild.get_channel(CHANNEL_ACCUEIL_ID)
+            if accueil_channel:
+                await accueil_channel.send(
+                    f"🎉 Bienvenue {member.mention} dans la team **{ctx.guild.name}** !\n"
+                    f"Ta candidature a ete validee. Tu as maintenant acces a tous les salons."
+                )
 
             # Notifier le membre en DM
             try:

@@ -39,17 +39,7 @@ class EventsCog(commands.Cog):
         async with self.bot.db_pool.acquire() as db_connection:
             await UserProfile.get_or_create_user(member.name, db_connection, member)
 
-        # Envoyer un message dans le canal d'accueil
-        accueil_channel = member.guild.get_channel(CHANNEL_ACCUEIL_ID)
-        if accueil_channel:
-            await accueil_channel.send(
-                f"Bienvenue {member.mention} sur **{member.guild.name}** !\n\n"
-                f"Je t'envoie les instructions d'inscription en message prive..."
-            )
-        else:
-            logger.warning(f"Canal accueil (ID: {CHANNEL_ACCUEIL_ID}) introuvable")
-
-        # Demarrer automatiquement l'inscription en DM
+        # Demarrer automatiquement l'inscription en DM (pas de message public)
         registration_cog = self.bot.get_cog("RegistrationCog")
         if registration_cog:
             await registration_cog.start_registration(member)
