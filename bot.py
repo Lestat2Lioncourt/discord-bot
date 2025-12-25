@@ -122,35 +122,132 @@ async def add_user(ctx, user_id: int, user_name: str):
 # ===============================================================================
 # Commande `help` personnalisée
 # ===============================================================================
-@bot.command(name="help")
+@bot.command(name="help", aliases=["aide", "commands", "commandes"])
 async def custom_help(ctx, command_name: str = None):
-    """Commande personnalisée pour afficher une aide contextuelle."""
+    """Commande personnalisee pour afficher une aide contextuelle."""
+
+    # Details de toutes les commandes
+    commands_details = {
+        # General
+        "help": {
+            "desc": "Affiche cette aide.",
+            "usage": "!help [commande]",
+            "aliases": "!aide, !commands"
+        },
+        "langue": {
+            "desc": "Change ta langue preferee (FR/EN).",
+            "usage": "!langue",
+            "aliases": "!language, !lang"
+        },
+        # Inscription
+        "inscription": {
+            "desc": "Demarre ou reprend le processus d'inscription.",
+            "usage": "!inscription",
+            "aliases": "-"
+        },
+        "profil": {
+            "desc": "Affiche ton profil ou celui d'un membre.",
+            "usage": "!profil [@membre]",
+            "aliases": "-"
+        },
+        "joueur": {
+            "desc": "Affiche tes joueurs et permet d'en ajouter.",
+            "usage": "!joueur",
+            "aliases": "!player, !joueurs, !players"
+        },
+        "localisation": {
+            "desc": "Definit ta localisation pour la carte des membres.",
+            "usage": "!localisation <ville ou adresse>",
+            "aliases": "-"
+        },
+        # Sages
+        "pending": {
+            "desc": "Liste les inscriptions en attente de validation.",
+            "usage": "!pending",
+            "aliases": "!attente, !inscriptions",
+            "sage": True
+        },
+        "valider": {
+            "desc": "Valide un membre et le promeut en Membre.",
+            "usage": "!valider @membre",
+            "aliases": "!approve, !accepter",
+            "sage": True
+        },
+        "refuser": {
+            "desc": "Refuse un membre avec une raison optionnelle.",
+            "usage": "!refuser @membre [raison]",
+            "aliases": "!refuse, !reject",
+            "sage": True
+        },
+        "profil-admin": {
+            "desc": "Affiche le profil complet d'un membre (vue admin).",
+            "usage": "!profil-admin @membre",
+            "aliases": "!profile-admin",
+            "sage": True
+        },
+    }
 
     if command_name is None:
-        # Création de l'embed pour la liste des commandes
+        # Liste complete des commandes
         embed = discord.Embed(
-            title="Liste des commandes disponibles",
-            description="Utilisez `!help <commande>` pour plus de détails sur une commande spécifique.",
+            title="📚 Commandes disponibles",
+            description="Utilise `!help <commande>` pour plus de details.",
             color=discord.Color.blue()
         )
-        embed.add_field(name="!help", value="Affiche cette aide.", inline=False)
-        embed.add_field(name="!add_user", value="Ajoute un utilisateur dans la base de données. (Usage : `!add_user <id> <nom>`)", inline=False)
 
+        # Commandes generales
+        embed.add_field(
+            name="🌐 General",
+            value=(
+                "`!help` - Affiche cette aide\n"
+                "`!langue` - Change ta langue (FR/EN)"
+            ),
+            inline=False
+        )
+
+        # Commandes inscription/profil
+        embed.add_field(
+            name="👤 Inscription & Profil",
+            value=(
+                "`!inscription` - Demarre l'inscription\n"
+                "`!profil` - Affiche ton profil\n"
+                "`!joueur` - Gere tes joueurs\n"
+                "`!localisation` - Definit ta position"
+            ),
+            inline=False
+        )
+
+        # Commandes Sages
+        embed.add_field(
+            name="⚖️ Sages (moderateurs)",
+            value=(
+                "`!pending` - Inscriptions en attente\n"
+                "`!valider @user` - Valide un membre\n"
+                "`!refuser @user` - Refuse un membre\n"
+                "`!profil-admin @user` - Profil complet"
+            ),
+            inline=False
+        )
+
+        embed.set_footer(text="This Is PSG - Tennis Clash Team")
         await ctx.send(embed=embed)
 
     else:
-        # Détails d'une commande spécifique
-        commands_details = {
-            "help": "Affiche la liste des commandes ou des informations sur une commande spécifique.",
-            "add_user": "Ajoute un utilisateur dans la base de données. Usage : `!add_user <id> <nom>`"
-        }
-        detail = commands_details.get(command_name.lower(), "Commande non reconnue. Utilisez `!help` pour la liste complète.")
-        embed = discord.Embed(
-            title=f"Détails de la commande `{command_name}`",
-            description=detail,
-            color=discord.Color.green()
-        )
-        await ctx.send(embed=embed)
+        # Details d'une commande specifique
+        cmd = commands_details.get(command_name.lower())
+        if cmd:
+            embed = discord.Embed(
+                title=f"📖 Commande `!{command_name.lower()}`",
+                color=discord.Color.green()
+            )
+            embed.add_field(name="Description", value=cmd["desc"], inline=False)
+            embed.add_field(name="Usage", value=f"`{cmd['usage']}`", inline=True)
+            embed.add_field(name="Aliases", value=cmd["aliases"], inline=True)
+            if cmd.get("sage"):
+                embed.add_field(name="⚠️ Permission", value="Reservee aux Sages", inline=False)
+            await ctx.send(embed=embed)
+        else:
+            await ctx.send(f"Commande `{command_name}` non reconnue. Utilise `!help` pour la liste.")
 
 # ===============================================================================
 # Fonction d'initialisation
