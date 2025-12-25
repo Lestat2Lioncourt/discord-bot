@@ -1,0 +1,82 @@
+{
+  "lang_name": "Français",
+  "lang_flag": "🇫🇷",
+
+  "welcome": {
+    "title": "Bienvenue **{display_name}** !",
+    "intro": "Je vais te guider dans ton inscription pour rejoindre la team.\nReponds aux questions suivantes.",
+    "already_registered": "Tu es deja inscrit et valide !"
+  },
+
+  "language": {
+    "question": "Choisis ta langue / Select your language"
+  },
+
+  "charte": {
+    "intro": "# 1️⃣ La Charte du serveur\n\nAvant de continuer, lis attentivement la charte ci-jointe.",
+    "instruction": "Ouvre le fichier, lis-le entierement, puis clique sur le bouton pour accepter.",
+    "accept_button": "J'ai lu et j'accepte la charte",
+    "refuse_button": "Je refuse",
+    "accepted": "Charte acceptee !",
+    "refused": "L'acceptation de la charte est **obligatoire** pour rejoindre la team.\nTon inscription est annulee.\n\nSi tu changes d'avis, tape `!inscription` pour recommencer.",
+    "timeout": "Temps ecoule. Tape `!inscription` pour recommencer."
+  },
+
+  "profile": {
+    "title": "# 4️⃣ Complete ton profil",
+    "existing_players": "**Tu as deja des joueurs enregistres :**",
+    "keep_or_reset": "Veux-tu les **conserver** ou **tout effacer** et recommencer ?",
+    "choose_option": "Choisis une option :",
+    "keep_button": "Conserver",
+    "reset_button": "Tout effacer",
+    "players_kept": "Joueurs conserves.",
+    "players_deleted": "Effacement des joueurs...",
+    "players_cleared": "Joueurs effaces. On recommence..."
+  },
+
+  "players": {
+    "title": "**4.1 Tes joueurs dans le jeu**",
+    "intro": "Saisis les noms de tes joueurs **tels qu'ils apparaissent dans Tennis Clash**.\nTu peux avoir plusieurs joueurs dans chaque equipe.\nTape `.` pour passer a l'equipe suivante.",
+    "team_main": "▶️ **{team_name}** (equipe principale) :",
+    "team_other": "▶️ **{team_name}** :",
+    "name_too_short": "Nom trop court, reessaie :",
+    "name_too_long": "Nom trop long, reessaie :",
+    "player_added": "Joueur **{player_name}** ajoute ! (`.` pour terminer, ou autre nom) :",
+    "player_exists": "Le joueur **{player_name}** existe deja dans cette equipe. Autre nom ou `.` :",
+    "error": "Erreur lors de l'ajout. Reessaie :",
+    "timeout": "Temps ecoule, on continue...",
+    "count": "✓ {count} joueur(s) dans {team_name}"
+  },
+
+  "location": {
+    "title": "**4.2 Ta localisation** *(facultatif)*",
+    "intro": "📍 Permet de t'afficher sur la **carte des membres**.\n\nTu peux etre plus ou moins precis :\n• Simple : pays ou region (*France*, *Bretagne*)\n• Precis : ville ou adresse (*Paris*, *75001 Paris*)\n\nSaisis ta localisation ou `.` pour passer :",
+    "searching": "Recherche de la localisation...",
+    "saved": "Localisation enregistree : **{address}**",
+    "not_found": "Localisation non trouvee. Tu pourras la modifier plus tard avec `!profil`.",
+    "service_error": "Service de localisation indisponible. Tu pourras reessayer plus tard.",
+    "error": "Erreur lors de la localisation. Tu pourras reessayer plus tard.",
+    "skipped": "Localisation ignoree.",
+    "timeout": "Temps ecoule."
+  },
+
+  "finish": {
+    "title": "**Inscription terminee !**",
+    "your_players": "**Tes joueurs :**",
+    "pending": "Ton inscription est maintenant **en attente de validation** par un Sage.\nTu seras notifie des que ta candidature sera examinee.\n\nUtilise `!profil` pour voir tes informations.",
+    "approved": "Felicitations ! Ta candidature a ete **validee** par {sage_name}.\nTu as maintenant acces a tous les salons du serveur.\n\nBienvenue dans la team !",
+    "refused": "Ta candidature a ete **refusee** par un Sage.",
+    "refused_reason": "**Raison:** {reason}",
+    "refused_contact": "Si tu penses que c'est une erreur, contacte un Sage."
+  },
+
+  "errors": {
+    "dm_failed": "Je ne peux pas t'envoyer de message prive. Verifie tes parametres.",
+    "sage_only": "Cette commande est reservee aux Sages."
+  },
+
+  "commands": {
+    "inscription_public": "Je t'envoie les instructions en message prive...",
+    "joueur_public": "Je t'envoie le formulaire d'ajout en message prive..."
+  }
+}

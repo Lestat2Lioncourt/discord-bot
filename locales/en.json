@@ -1,0 +1,82 @@
+{
+  "lang_name": "English",
+  "lang_flag": "🇬🇧",
+
+  "welcome": {
+    "title": "Welcome **{display_name}**!",
+    "intro": "I will guide you through the registration process to join the team.\nAnswer the following questions.",
+    "already_registered": "You are already registered and validated!"
+  },
+
+  "language": {
+    "question": "Choisis ta langue / Select your language"
+  },
+
+  "charte": {
+    "intro": "# 1️⃣ Server Rules\n\nBefore continuing, please read the attached charter carefully.",
+    "instruction": "Open the file, read it entirely, then click the button to accept.",
+    "accept_button": "I have read and accept the charter",
+    "refuse_button": "I refuse",
+    "accepted": "Charter accepted!",
+    "refused": "Accepting the charter is **mandatory** to join the team.\nYour registration has been cancelled.\n\nIf you change your mind, type `!inscription` to start again.",
+    "timeout": "Time expired. Type `!inscription` to start again."
+  },
+
+  "profile": {
+    "title": "# 4️⃣ Complete your profile",
+    "existing_players": "**You already have registered players:**",
+    "keep_or_reset": "Do you want to **keep** them or **delete all** and start over?",
+    "choose_option": "Choose an option:",
+    "keep_button": "Keep",
+    "reset_button": "Delete all",
+    "players_kept": "Players kept.",
+    "players_deleted": "Deleting players...",
+    "players_cleared": "Players deleted. Starting over..."
+  },
+
+  "players": {
+    "title": "**4.1 Your in-game players**",
+    "intro": "Enter your player names **as they appear in Tennis Clash**.\nYou can have multiple players in each team.\nType `.` to skip to the next team.",
+    "team_main": "▶️ **{team_name}** (main team):",
+    "team_other": "▶️ **{team_name}**:",
+    "name_too_short": "Name too short, try again:",
+    "name_too_long": "Name too long, try again:",
+    "player_added": "Player **{player_name}** added! (`.` to finish, or another name):",
+    "player_exists": "Player **{player_name}** already exists in this team. Another name or `.`:",
+    "error": "Error adding player. Try again:",
+    "timeout": "Time expired, moving on...",
+    "count": "✓ {count} player(s) in {team_name}"
+  },
+
+  "location": {
+    "title": "**4.2 Your location** *(optional)*",
+    "intro": "📍 Allows you to appear on the **members map**.\n\nYou can be more or less precise:\n• Simple: country or region (*France*, *Brittany*)\n• Precise: city or address (*Paris*, *75001 Paris*)\n\nEnter your location or `.` to skip:",
+    "searching": "Searching for location...",
+    "saved": "Location saved: **{address}**",
+    "not_found": "Location not found. You can change it later with `!profil`.",
+    "service_error": "Location service unavailable. You can try again later.",
+    "error": "Error during location search. You can try again later.",
+    "skipped": "Location skipped.",
+    "timeout": "Time expired."
+  },
+
+  "finish": {
+    "title": "**Registration complete!**",
+    "your_players": "**Your players:**",
+    "pending": "Your registration is now **pending validation** by a Sage.\nYou will be notified once your application is reviewed.\n\nUse `!profil` to see your information.",
+    "approved": "Congratulations! Your application has been **approved** by {sage_name}.\nYou now have access to all server channels.\n\nWelcome to the team!",
+    "refused": "Your application has been **refused** by a Sage.",
+    "refused_reason": "**Reason:** {reason}",
+    "refused_contact": "If you think this is a mistake, contact a Sage."
+  },
+
+  "errors": {
+    "dm_failed": "I cannot send you a private message. Check your settings.",
+    "sage_only": "This command is reserved for Sages."
+  },
+
+  "commands": {
+    "inscription_public": "I'm sending you the instructions in private message...",
+    "joueur_public": "I'm sending you the form in private message..."
+  }
+}

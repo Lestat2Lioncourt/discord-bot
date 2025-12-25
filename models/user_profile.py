@@ -26,7 +26,7 @@ class UserProfile:
 
         # Champs existants
         self.game_name = None  # Deprecated - utiliser players
-        self.language = None
+        self.language = "fr"  # Langue par defaut
         self.localisation = None
         self.latitude = None
         self.longitude = None
@@ -42,7 +42,7 @@ class UserProfile:
         logger.debug(f"Vérification du profil pour {username}")
 
         query = """
-        SELECT username, discord_name, last_connection, charte_validated, approval_status
+        SELECT username, discord_name, last_connection, charte_validated, approval_status, language
         FROM user_profile WHERE username = $1
         """
         existing_user = await db_connection.fetchrow(query, username)
@@ -66,6 +66,7 @@ class UserProfile:
             )
             profile.charte_validated = existing_user.get('charte_validated', False)
             profile.approval_status = existing_user.get('approval_status', 'pending')
+            profile.language = existing_user.get('language', 'fr')
             return profile
 
         # Créer un nouveau profil
@@ -114,7 +115,7 @@ class UserProfile:
             result = await self.db_connection.fetchrow(query, self.username)
             if result:
                 self.game_name = result["game_name"]
-                self.language = result["language"]
+                self.language = result.get("language") or "fr"
                 self.localisation = result["localisation"]
                 self.latitude = result["latitude"]
                 self.longitude = result["longitude"]
@@ -175,6 +176,15 @@ class UserProfile:
         self.latitude = None
         self.longitude = None
         logger.info(f"Localisation supprimée pour {self.username}")
+
+    async def set_language(self, language: str) -> None:
+        """Definit la langue du membre."""
+        if language not in ("fr", "en"):
+            language = "fr"
+        query = "UPDATE user_profile SET language = $1 WHERE username = $2"
+        await self.db_connection.execute(query, language, self.username)
+        self.language = language
+        logger.debug(f"Langue definie pour {self.username}: {language}")
 
     def is_registration_complete(self) -> bool:
         """Vérifie si l'inscription est complète (charte validée)."""

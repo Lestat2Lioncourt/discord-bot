@@ -2,8 +2,8 @@
 Cog pour gerer l'inscription des nouveaux membres.
 
 Flow:
-1. Nouveau membre rejoint -> demarre automatiquement en DM
-2. Validation de la charte (OBLIGATOIRE)
+1. Choix de la langue (FR/EN)
+2. Validation de la charte (fichier HTML + bouton unique)
 3. "As-tu des joueurs dans This Is PSG ?" -> saisie jusqu'a vide
 4. "As-tu des joueurs dans This Is PSG 2 ?" -> saisie jusqu'a vide
 5. Localisation (optionnel, pour la carte des membres)
@@ -22,7 +22,8 @@ from models.player import Player, Team
 from utils.database import Database
 from utils.logger import get_logger
 from utils.roles import is_newbie, is_membre, is_sage
-from config import CHARTE_TEXTS, DATA_DIR, CHANNEL_ACCUEIL_ID
+from utils.i18n import t, Translator
+from config import CHARTE_FILES, DATA_DIR, CHANNEL_ACCUEIL_ID
 
 logger = get_logger("cogs.registration")
 
@@ -52,96 +53,79 @@ class RegistrationCog(commands.Cog):
 
         # Si deja valide, ne pas relancer
         if profile.charte_validated and profile.approval_status == "approved":
-            await dm_channel.send("Tu es deja inscrit et valide !")
+            lang = profile.language
+            await dm_channel.send(t("welcome.already_registered", lang))
             return
 
         # Marquer comme en cours d'inscription
-        self.active_registrations[username] = "charte"
+        self.active_registrations[username] = "language"
 
-        # Message de bienvenue
+        # Etape 1: Choix de la langue
+        await self.ask_language(member, dm_channel)
+
+    async def ask_language(self, member: discord.Member, dm_channel: discord.DMChannel):
+        """Demande la langue preferee."""
+        view = LanguageSelectView(member)
         await dm_channel.send(
-            f"Bienvenue **{member.display_name}** !\n\n"
-            f"Je vais te guider dans ton inscription pour rejoindre la team.\n"
-            f"Reponds aux questions suivantes."
-        )
-
-        await asyncio.sleep(1)
-
-        # Etape 1: Charte
-        await self.send_charte(member, dm_channel)
-
-    async def send_charte(self, member: discord.Member, dm_channel: discord.DMChannel):
-        """Envoie la charte section par section, efface entre chaque."""
-        username = member.name
-
-        # Charger les sections de la charte
-        charte_files = ["0_intro", "1_regles_generales", "2_structure_roles", "3_regles_fonctionnement"]
-        sections = []
-
-        for key in charte_files:
-            if key not in CHARTE_TEXTS:
-                continue
-            file_path = CHARTE_TEXTS[key]
-            if not file_path.exists():
-                logger.warning(f"Fichier charte introuvable: {file_path}")
-                continue
-            with open(file_path, "r", encoding="utf-8") as f:
-                sections.append(f.read().strip())
-
-        # Afficher chaque section, effacer avant la suivante
-        messages_to_delete = []
-
-        for i, section in enumerate(sections):
-            # Envoyer la section
-            msg = await dm_channel.send(section)
-            messages_to_delete.append(msg)
-
-            # Bouton Suivant sauf pour la derniere section
-            if i < len(sections) - 1:
-                btn_msg = await dm_channel.send(
-                    f"*Section {i+1}/{len(sections)}*",
-                    view=NextButtonView(member, messages_to_delete.copy())
-                )
-                messages_to_delete.append(btn_msg)
-
-                # Attendre le clic
-                try:
-                    await self.wait_for_next_click(member, timeout=300)
-                except asyncio.TimeoutError:
-                    await dm_channel.send("Temps ecoule. Tape `!inscription` pour recommencer.")
-                    self.active_registrations.pop(username, None)
-                    return
-
-                # Effacer les messages precedents
-                for msg in messages_to_delete:
-                    try:
-                        await msg.delete()
-                    except Exception:
-                        pass
-                messages_to_delete.clear()
-
-        # Validation finale
-        await asyncio.sleep(0.3)
-        view = CharteValidationView(self, member, "final")
-        await dm_channel.send(
-            "**Acceptes-tu cette charte dans son integralite ?**\n"
-            "*En acceptant, tu t'engages a respecter ces regles.*",
+            "**Choisis ta langue / Select your language**",
             view=view
         )
 
         try:
             await asyncio.wait_for(view.wait(), timeout=300)
         except asyncio.TimeoutError:
-            await dm_channel.send("Temps ecoule. Tape `!inscription` pour recommencer.")
+            await dm_channel.send("Temps ecoule / Time expired.")
+            self.active_registrations.pop(member.name, None)
+            return
+
+        lang = view.language or "fr"
+
+        # Sauvegarder la langue
+        async with self.bot.db_pool.acquire() as conn:
+            profile = await UserProfile.get_or_create_user(member.name, conn, member)
+            await profile.set_language(lang)
+
+        # Message de bienvenue
+        await dm_channel.send(t("welcome.title", lang, display_name=member.display_name))
+        await dm_channel.send(t("welcome.intro", lang))
+        await asyncio.sleep(1)
+
+        # Etape 2: Charte
+        await self.send_charte(member, dm_channel, lang)
+
+    async def send_charte(self, member: discord.Member, dm_channel: discord.DMChannel, lang: str):
+        """Envoie la charte en fichier HTML et demande validation."""
+        username = member.name
+
+        # Message d'intro
+        await dm_channel.send(t("charte.intro", lang))
+        await asyncio.sleep(0.5)
+
+        # Envoyer le fichier HTML
+        charte_file = CHARTE_FILES.get(lang, CHARTE_FILES["fr"])
+        if charte_file.exists():
+            file = discord.File(charte_file, filename=f"charte_{lang}.html")
+            await dm_channel.send(t("charte.instruction", lang), file=file)
+        else:
+            logger.error(f"Fichier charte introuvable: {charte_file}")
+            await dm_channel.send("Erreur: fichier charte introuvable.")
+            return
+
+        await asyncio.sleep(1)
+
+        # Bouton de validation
+        view = CharteAcceptView(member, lang)
+        await dm_channel.send("", view=view)
+
+        try:
+            await asyncio.wait_for(view.wait(), timeout=600)  # 10 minutes pour lire
+        except asyncio.TimeoutError:
+            await dm_channel.send(t("charte.timeout", lang))
             self.active_registrations.pop(username, None)
             return
 
         if not view.accepted:
-            await dm_channel.send(
-                "L'acceptation de la charte est **obligatoire** pour rejoindre la team.\n"
-                "Ton inscription est annulee.\n\n"
-                "Si tu changes d'avis, tape `!inscription` pour recommencer."
-            )
+            await dm_channel.send(t("charte.refused", lang))
             self.active_registrations.pop(username, None)
             return
 
@@ -150,29 +134,17 @@ class RegistrationCog(commands.Cog):
             profile = await UserProfile.get_or_create_user(username, conn, member)
             await profile.validate_charte()
 
-        await dm_channel.send("Charte acceptee !")
+        await dm_channel.send(t("charte.accepted", lang))
         await asyncio.sleep(1)
 
-        # Etape 4: Completer le profil
-        await self.complete_profile(member, dm_channel)
+        # Etape 3: Completer le profil
+        await self.complete_profile(member, dm_channel, lang)
 
-    async def wait_for_next_click(self, member: discord.Member, timeout: int = 300):
-        """Attend que le membre clique sur Suivant."""
-        def check(interaction: discord.Interaction):
-            return (
-                interaction.user == member and
-                interaction.type == discord.InteractionType.component
-            )
-
-        await self.bot.wait_for("interaction", check=check, timeout=timeout)
-
-    async def complete_profile(self, member: discord.Member, dm_channel: discord.DMChannel):
+    async def complete_profile(self, member: discord.Member, dm_channel: discord.DMChannel, lang: str):
         """Etape 4: Completer le profil (joueurs + localisation)."""
         username = member.name
 
-        await dm_channel.send(
-            "# 4️⃣ Complete ton profil"
-        )
+        await dm_channel.send(t("profile.title", lang))
         await asyncio.sleep(0.5)
 
         # Verifier si le membre a deja des joueurs enregistres
@@ -183,59 +155,53 @@ class RegistrationCog(commands.Cog):
             team1 = [p.player_name for p in existing_players if p.team_name == "This Is PSG"]
             team2 = [p.player_name for p in existing_players if p.team_name == "This Is PSG 2"]
 
-            msg = "**Tu as deja des joueurs enregistres :**\n"
+            msg = t("profile.existing_players", lang) + "\n"
             if team1:
                 msg += f"• This Is PSG : {', '.join(team1)}\n"
             if team2:
                 msg += f"• This Is PSG 2 : {', '.join(team2)}\n"
-            msg += "\nVeux-tu les **conserver** ou **tout effacer** et recommencer ?"
+            msg += "\n" + t("profile.keep_or_reset", lang)
 
             await dm_channel.send(msg)
 
-            view = KeepOrResetView(member)
-            await dm_channel.send("Choisis une option :", view=view)
+            view = KeepOrResetView(member, lang)
+            await dm_channel.send(t("profile.choose_option", lang), view=view)
 
             try:
                 await asyncio.wait_for(view.wait(), timeout=300)
             except asyncio.TimeoutError:
-                await dm_channel.send("Temps ecoule, on conserve les joueurs existants.")
+                await dm_channel.send(t("profile.players_kept", lang))
                 view.keep = True
 
             if not view.keep:
-                # Supprimer tous les joueurs existants
                 await Player.delete_all_for_member(self.bot.db_pool, username)
-                await dm_channel.send("Joueurs effaces. On recommence...")
+                await dm_channel.send(t("profile.players_cleared", lang))
                 await asyncio.sleep(0.5)
 
         # 4.1 Joueurs
-        await dm_channel.send(
-            "**4.1 Tes joueurs dans le jeu**\n\n"
-            "Saisis les noms de tes joueurs **tels qu'ils apparaissent dans Tennis Clash**.\n"
-            "Tu peux avoir plusieurs joueurs dans chaque equipe.\n"
-            "Tape `.` pour passer a l'equipe suivante."
-        )
+        await dm_channel.send(t("players.title", lang))
+        await dm_channel.send(t("players.intro", lang))
         await asyncio.sleep(0.5)
 
         # Team 1
-        await self.ask_players_for_team(member, dm_channel, 1, "This Is PSG", is_main_team=True)
+        await self.ask_players_for_team(member, dm_channel, 1, "This Is PSG", lang, is_main_team=True)
 
         # Team 2
-        await self.ask_players_for_team(member, dm_channel, 2, "This Is PSG 2", is_main_team=False)
+        await self.ask_players_for_team(member, dm_channel, 2, "This Is PSG 2", lang, is_main_team=False)
 
         # 4.2 Localisation
         await asyncio.sleep(0.5)
-        await self.ask_location(member, dm_channel)
+        await self.ask_location(member, dm_channel, lang)
 
     async def ask_players_for_team(self, member: discord.Member, dm_channel: discord.DMChannel,
-                                    team_id: int, team_name: str, is_main_team: bool = True):
+                                    team_id: int, team_name: str, lang: str, is_main_team: bool = True):
         """Demande les joueurs pour une equipe."""
         username = member.name
 
-        # Message clair
         if is_main_team:
-            await dm_channel.send(f"\n▶️ **{team_name}** (equipe principale) :")
+            await dm_channel.send(t("players.team_main", lang, team_name=team_name))
         else:
-            await dm_channel.send(f"\n▶️ **{team_name}** :")
+            await dm_channel.send(t("players.team_other", lang, team_name=team_name))
 
         players_added = []
         while True:
@@ -246,48 +212,39 @@ class RegistrationCog(commands.Cog):
                 msg = await self.bot.wait_for("message", check=check, timeout=120)
                 player_name = msg.content.strip()
 
-                # Fin de saisie
                 if player_name == "." or player_name.lower() == "stop" or not player_name:
                     break
 
-                # Validation basique
                 if len(player_name) < 2:
-                    await dm_channel.send("Nom trop court, reessaie :")
+                    await dm_channel.send(t("players.name_too_short", lang))
                     continue
                 if len(player_name) > 50:
-                    await dm_channel.send("Nom trop long, reessaie :")
+                    await dm_channel.send(t("players.name_too_long", lang))
                     continue
 
-                # Enregistrer le joueur
                 try:
                     await Player.create(self.bot.db_pool, username, player_name, team_id)
                     players_added.append(player_name)
-                    await dm_channel.send(f"Joueur **{player_name}** ajoute ! (`.` pour terminer, ou autre nom) :")
+                    await dm_channel.send(t("players.player_added", lang, player_name=player_name))
                 except Exception as e:
                     error_msg = str(e)
                     if "unique_player_per_team" in error_msg or "duplicate key" in error_msg.lower():
-                        await dm_channel.send(f"Le joueur **{player_name}** existe deja dans cette equipe. Autre nom ou `.` :")
+                        await dm_channel.send(t("players.player_exists", lang, player_name=player_name))
                     else:
                         logger.error(f"Erreur creation joueur: {e}")
-                        await dm_channel.send(f"Erreur lors de l'ajout. Reessaie :")
+                        await dm_channel.send(t("players.error", lang))
 
             except asyncio.TimeoutError:
-                await dm_channel.send("Temps ecoule, on continue...")
+                await dm_channel.send(t("players.timeout", lang))
                 break
 
         if players_added:
-            await dm_channel.send(f"✓ {len(players_added)} joueur(s) dans {team_name}")
+            await dm_channel.send(t("players.count", lang, count=len(players_added), team_name=team_name))
 
-    async def ask_location(self, member: discord.Member, dm_channel: discord.DMChannel):
+    async def ask_location(self, member: discord.Member, dm_channel: discord.DMChannel, lang: str):
         """Demande la localisation (optionnel)."""
-        await dm_channel.send(
-            "**4.2 Ta localisation** *(facultatif)*\n\n"
-            "📍 Permet de t'afficher sur la **carte des membres**.\n\n"
-            "Tu peux etre plus ou moins precis :\n"
-            "• Simple : pays ou region (*France*, *Bretagne*)\n"
-            "• Precis : ville ou adresse (*Paris*, *75001 Paris*)\n\n"
-            "Saisis ta localisation ou `.` pour passer :"
-        )
+        await dm_channel.send(t("location.title", lang))
+        await dm_channel.send(t("location.intro", lang))
 
         def check(m):
             return m.author == member and isinstance(m.channel, discord.DMChannel)
@@ -297,23 +254,23 @@ class RegistrationCog(commands.Cog):
             location = msg.content.strip()
 
             if location and location != ".":
-                await self.save_location(member, dm_channel, location)
+                await self.save_location(member, dm_channel, location, lang)
             else:
-                await dm_channel.send("Localisation ignoree.")
-                await self.finish_registration(member, dm_channel)
+                await dm_channel.send(t("location.skipped", lang))
+                await self.finish_registration(member, dm_channel, lang)
 
         except asyncio.TimeoutError:
-            await dm_channel.send("Temps ecoule.")
-            await self.finish_registration(member, dm_channel)
+            await dm_channel.send(t("location.timeout", lang))
+            await self.finish_registration(member, dm_channel, lang)
 
-    async def save_location(self, member: discord.Member, dm_channel: discord.DMChannel, location: str):
+    async def save_location(self, member: discord.Member, dm_channel: discord.DMChannel, location: str, lang: str):
         """Geocode et sauvegarde la localisation."""
         from geopy.geocoders import Nominatim
         from geopy.exc import GeocoderTimedOut
 
         username = member.name
 
-        await dm_channel.send("Recherche de la localisation...")
+        await dm_channel.send(t("location.searching", lang))
 
         try:
             geolocator = Nominatim(user_agent="discord-bot-this-is-psg")
@@ -324,22 +281,20 @@ class RegistrationCog(commands.Cog):
                     profile = await UserProfile.get_or_create_user(username, conn, member)
                     await profile.set_location(location, loc.latitude, loc.longitude)
 
-                await dm_channel.send(f"Localisation enregistree : **{loc.address}**")
+                await dm_channel.send(t("location.saved", lang, address=loc.address))
             else:
-                await dm_channel.send(
-                    "Localisation non trouvee. Tu pourras la modifier plus tard avec `!profil`."
-                )
+                await dm_channel.send(t("location.not_found", lang))
 
         except GeocoderTimedOut:
-            await dm_channel.send("Service de localisation indisponible. Tu pourras reessayer plus tard.")
+            await dm_channel.send(t("location.service_error", lang))
         except Exception as e:
             logger.error(f"Erreur geocoding: {e}")
-            await dm_channel.send("Erreur lors de la localisation. Tu pourras reessayer plus tard.")
+            await dm_channel.send(t("location.error", lang))
 
         await asyncio.sleep(1)
-        await self.finish_registration(member, dm_channel)
+        await self.finish_registration(member, dm_channel, lang)
 
-    async def finish_registration(self, member: discord.Member, dm_channel: discord.DMChannel):
+    async def finish_registration(self, member: discord.Member, dm_channel: discord.DMChannel, lang: str):
         """Termine l'inscription."""
         username = member.name
         self.active_registrations.pop(username, None)
@@ -347,19 +302,15 @@ class RegistrationCog(commands.Cog):
         # Compter les joueurs enregistres
         players = await Player.get_by_member(self.bot.db_pool, username)
 
-        summary = f"**Inscription terminee !**\n\n"
+        summary = t("finish.title", lang) + "\n\n"
 
         if players:
-            summary += "**Tes joueurs :**\n"
+            summary += t("finish.your_players", lang) + "\n"
             for p in players:
-                summary += f"- {p.player_name} ({p.team_name or 'Sans equipe'})\n"
+                summary += f"- {p.player_name} ({p.team_name or 'N/A'})\n"
             summary += "\n"
 
-        summary += (
-            "Ton inscription est maintenant **en attente de validation** par un Sage.\n"
-            "Tu seras notifie des que ta candidature sera examinee.\n\n"
-            "Utilise `!profil` pour voir tes informations."
-        )
+        summary += t("finish.pending", lang)
 
         await dm_channel.send(summary)
         logger.info(f"Inscription terminee pour {username}, en attente de validation")
@@ -368,7 +319,10 @@ class RegistrationCog(commands.Cog):
     async def cmd_inscription(self, ctx):
         """Demarre ou reprend le processus d'inscription."""
         if not isinstance(ctx.channel, discord.DMChannel):
-            await ctx.send("Je t'envoie les instructions en message prive...")
+            # Recuperer la langue du profil si existant
+            async with self.bot.db_pool.acquire() as conn:
+                profile = await UserProfile.get_or_create_user(ctx.author.name, conn, ctx.author)
+            await ctx.send(t("commands.inscription_public", profile.language))
 
         await self.start_registration(ctx.author)
 
@@ -382,7 +336,6 @@ class RegistrationCog(commands.Cog):
             profile = await UserProfile.get_or_create_user(username, conn, target)
             await profile.load_from_db()
 
-        # Recuperer les joueurs
         players = await Player.get_by_member(self.bot.db_pool, username)
 
         embed = discord.Embed(
@@ -396,11 +349,15 @@ class RegistrationCog(commands.Cog):
             inline=False
         )
 
+        embed.add_field(
+            name="Langue",
+            value="🇫🇷 Francais" if profile.language == "fr" else "🇬🇧 English",
+            inline=True
+        )
+
         if players:
-            # Grouper par equipe
             team1_players = [p for p in players if p.team_name == "This Is PSG"]
             team2_players = [p for p in players if p.team_name == "This Is PSG 2"]
-            other_players = [p for p in players if p.team_name not in ("This Is PSG", "This Is PSG 2")]
 
             if team1_players:
                 names = ", ".join([p.player_name for p in team1_players])
@@ -409,17 +366,12 @@ class RegistrationCog(commands.Cog):
             if team2_players:
                 names = ", ".join([p.player_name for p in team2_players])
                 embed.add_field(name="This Is PSG 2", value=names, inline=False)
-
-            if other_players:
-                names = ", ".join([p.player_name for p in other_players])
-                embed.add_field(name="Autres", value=names, inline=False)
         else:
             embed.add_field(name="Joueurs", value="Aucun joueur enregistre", inline=False)
 
         if profile.localisation:
             embed.add_field(name="Localisation", value=profile.localisation, inline=False)
 
-        # Si c'est son propre profil, proposer l'edition
         if target == ctx.author:
             embed.set_footer(text="Utilise !joueur, !localisation pour modifier")
 
@@ -431,109 +383,65 @@ class RegistrationCog(commands.Cog):
         username = ctx.author.name
         member = ctx.author
 
-        # Afficher les joueurs existants
+        async with self.bot.db_pool.acquire() as conn:
+            profile = await UserProfile.get_or_create_user(username, conn, member)
+        lang = profile.language
+
         players = await Player.get_by_member(self.bot.db_pool, username)
 
         if players:
             team1 = [p.player_name for p in players if p.team_name == "This Is PSG"]
             team2 = [p.player_name for p in players if p.team_name == "This Is PSG 2"]
 
-            msg = "**Tes joueurs actuels :**\n"
+            msg = t("profile.existing_players", lang) + "\n"
             if team1:
                 msg += f"This Is PSG : {', '.join(team1)}\n"
             if team2:
                 msg += f"This Is PSG 2 : {', '.join(team2)}\n"
             await ctx.send(msg)
         else:
-            await ctx.send("Tu n'as aucun joueur enregistre.")
+            await ctx.send("Aucun joueur enregistre." if lang == "fr" else "No players registered.")
 
-        await ctx.send("Je t'envoie le formulaire d'ajout en message prive...")
+        await ctx.send(t("commands.joueur_public", lang))
 
-        # Demarrer la saisie en DM
         try:
             dm_channel = await member.create_dm()
-            await self.start_player_registration(member, dm_channel)
+            await self.start_player_registration(member, dm_channel, lang)
         except discord.Forbidden:
-            await ctx.send("Je ne peux pas t'envoyer de message prive. Verifie tes parametres.")
+            await ctx.send(t("errors.dm_failed", lang))
 
-    async def start_player_registration(self, member: discord.Member, dm_channel: discord.DMChannel):
+    async def start_player_registration(self, member: discord.Member, dm_channel: discord.DMChannel, lang: str):
         """Demarre uniquement la saisie des joueurs (sans charte)."""
         username = member.name
 
         await dm_channel.send("═" * 35)
-        await dm_channel.send("🎾 **GESTION DE TES JOUEURS** 🎾")
+        title = "🎾 **GESTION DE TES JOUEURS** 🎾" if lang == "fr" else "🎾 **MANAGE YOUR PLAYERS** 🎾"
+        await dm_channel.send(title)
         await asyncio.sleep(0.5)
 
         # Team 1
-        await self.ask_players_for_team_only(member, dm_channel, 1, "This Is PSG", is_main_team=True)
+        await self.ask_players_for_team(member, dm_channel, 1, "This Is PSG", lang, is_main_team=True)
 
         # Team 2
-        await self.ask_players_for_team_only(member, dm_channel, 2, "This Is PSG 2", is_main_team=False)
+        await self.ask_players_for_team(member, dm_channel, 2, "This Is PSG 2", lang, is_main_team=False)
 
         # Resume
         players = await Player.get_by_member(self.bot.db_pool, username)
         if players:
-            msg = "**Tes joueurs :**\n"
+            msg = t("finish.your_players", lang) + "\n"
             for p in players:
                 msg += f"- {p.player_name} ({p.team_name})\n"
             await dm_channel.send(msg)
         else:
-            await dm_channel.send("Aucun joueur enregistre.")
-
-    async def ask_players_for_team_only(self, member: discord.Member, dm_channel: discord.DMChannel,
-                                         team_id: int, team_name: str, is_main_team: bool = True):
-        """Saisie des joueurs pour une equipe (version standalone)."""
-        username = member.name
-
-        if is_main_team:
-            await dm_channel.send(
-                f"📋 **{team_name}** (equipe principale)\n"
-                f"Nom du joueur ou `.` si aucun :"
-            )
-        else:
-            await dm_channel.send(
-                f"📋 **{team_name}**\n"
-                f"Nom du joueur ou `.` si aucun :"
-            )
-
-        while True:
-            def check(m):
-                return m.author == member and isinstance(m.channel, discord.DMChannel)
-
-            try:
-                msg = await self.bot.wait_for("message", check=check, timeout=120)
-                player_name = msg.content.strip()
-
-                if player_name == "." or player_name.lower() == "stop" or not player_name:
-                    break
-
-                if len(player_name) < 2:
-                    await dm_channel.send("Nom trop court, reessaie :")
-                    continue
-                if len(player_name) > 50:
-                    await dm_channel.send("Nom trop long, reessaie :")
-                    continue
-
-                try:
-                    await Player.create(self.bot.db_pool, username, player_name, team_id)
-                    await dm_channel.send(f"Joueur **{player_name}** ajoute ! (`.` pour terminer, ou autre nom) :")
-                except Exception as e:
-                    error_msg = str(e)
-                    if "unique_player_per_team" in error_msg or "duplicate key" in error_msg.lower():
-                        await dm_channel.send(f"Le joueur **{player_name}** existe deja. Autre nom ou `.` :")
-                    else:
-                        logger.error(f"Erreur creation joueur: {e}")
-                        await dm_channel.send(f"Erreur. Reessaie :")
-
-            except asyncio.TimeoutError:
-                await dm_channel.send("Temps ecoule.")
-                break
-
-        await asyncio.sleep(0.3)
+            await dm_channel.send("Aucun joueur enregistre." if lang == "fr" else "No players registered.")
 
     @commands.command(name="localisation")
     async def cmd_localisation(self, ctx, *, location: str = None):
         """Definit ta localisation. Usage: !localisation MaVille"""
+        async with self.bot.db_pool.acquire() as conn:
+            profile = await UserProfile.get_or_create_user(ctx.author.name, conn, ctx.author)
+        lang = profile.language
+
         if not location:
             await ctx.send(
                 "**Usage:** `!localisation MaVille`\n"
@@ -558,130 +466,147 @@ class RegistrationCog(commands.Cog):
                     profile = await UserProfile.get_or_create_user(username, conn, ctx.author)
                     await profile.set_location(location, loc.latitude, loc.longitude)
 
-                await ctx.send(f"Localisation enregistree : **{loc.address}**")
+                await ctx.send(t("location.saved", lang, address=loc.address))
             else:
-                await ctx.send("Localisation non trouvee. Essaie avec un autre format.")
+                await ctx.send(t("location.not_found", lang))
 
         except GeocoderTimedOut:
-            await ctx.send("Service de localisation indisponible. Reessaie plus tard.")
+            await ctx.send(t("location.service_error", lang))
         except Exception as e:
             logger.error(f"Erreur geocoding: {e}")
-            await ctx.send("Erreur lors de la localisation.")
+            await ctx.send(t("location.error", lang))
+
+    @commands.command(name="langue", aliases=["language", "lang"])
+    async def cmd_langue(self, ctx):
+        """Change ta langue preferee."""
+        member = ctx.author
+        view = LanguageSelectView(member)
+        msg = await ctx.send("**Choisis ta langue / Select your language**", view=view)
+
+        try:
+            await asyncio.wait_for(view.wait(), timeout=60)
+        except asyncio.TimeoutError:
+            await msg.edit(content="Temps ecoule / Time expired.", view=None)
+            return
+
+        if view.language:
+            async with self.bot.db_pool.acquire() as conn:
+                profile = await UserProfile.get_or_create_user(member.name, conn, member)
+                await profile.set_language(view.language)
+
+            if view.language == "fr":
+                await msg.edit(content="Langue definie : 🇫🇷 Francais", view=None)
+            else:
+                await msg.edit(content="Language set: 🇬🇧 English", view=None)
 
 
-class CharteValidationView(View):
-    """Vue pour valider une clause de la charte."""
+# =============================================================================
+# Views
+# =============================================================================
 
-    def __init__(self, cog: RegistrationCog, member: discord.Member, clause_key: str):
+class LanguageSelectView(View):
+    """Vue pour choisir la langue."""
+
+    def __init__(self, member: discord.Member):
         super().__init__(timeout=300)
-        self.cog = cog
         self.member = member
-        self.clause_key = clause_key
-        self.accepted = False
-        self.message = None
+        self.language = None
 
-    @discord.ui.button(label="J'accepte", style=ButtonStyle.green)
-    async def accept(self, interaction: Interaction, button: Button):
+    @discord.ui.button(label="Francais", style=ButtonStyle.primary, emoji="🇫🇷")
+    async def french(self, interaction: Interaction, button: Button):
+        await interaction.response.defer()
+        if interaction.user != self.member:
+            return
+        self.language = "fr"
+        try:
+            await interaction.message.edit(content="🇫🇷 Francais selectionne", view=None)
+        except Exception:
+            pass
+        self.stop()
+
+    @discord.ui.button(label="English", style=ButtonStyle.primary, emoji="🇬🇧")
+    async def english(self, interaction: Interaction, button: Button):
+        await interaction.response.defer()
+        if interaction.user != self.member:
+            return
+        self.language = "en"
+        try:
+            await interaction.message.edit(content="🇬🇧 English selected", view=None)
+        except Exception:
+            pass
+        self.stop()
+
+
+class CharteAcceptView(View):
+    """Vue pour accepter/refuser la charte."""
+
+    def __init__(self, member: discord.Member, lang: str = "fr"):
+        super().__init__(timeout=600)
+        self.member = member
+        self.lang = lang
+        self.accepted = False
+
+        # Modifier les labels des boutons selon la langue
+        self.accept_btn.label = t("charte.accept_button", lang)
+        self.refuse_btn.label = t("charte.refuse_button", lang)
+
+    @discord.ui.button(label="J'accepte", style=ButtonStyle.green, custom_id="accept")
+    async def accept_btn(self, interaction: Interaction, button: Button):
         await interaction.response.defer()
         if interaction.user != self.member:
             return
         self.accepted = True
         try:
-            await interaction.message.edit(content="Charte acceptee !", view=None)
+            await interaction.message.edit(content="✅", view=None)
         except Exception:
             pass
         self.stop()
 
-    @discord.ui.button(label="Je refuse", style=ButtonStyle.red)
-    async def refuse(self, interaction: Interaction, button: Button):
+    @discord.ui.button(label="Je refuse", style=ButtonStyle.red, custom_id="refuse")
+    async def refuse_btn(self, interaction: Interaction, button: Button):
         await interaction.response.defer()
         if interaction.user != self.member:
             return
         self.accepted = False
         try:
-            await interaction.message.edit(content="Charte refusee.", view=None)
+            await interaction.message.edit(content="❌", view=None)
         except Exception:
             pass
         self.stop()
-
-
-class YesNoView(View):
-    """Vue simple Oui/Non."""
-
-    def __init__(self, member: discord.Member):
-        super().__init__(timeout=300)
-        self.member = member
-        self.answer = None
-
-    @discord.ui.button(label="Oui", style=ButtonStyle.green)
-    async def yes(self, interaction: Interaction, button: Button):
-        await interaction.response.defer()
-        if interaction.user != self.member:
-            return
-        self.answer = True
-        try:
-            await interaction.message.edit(view=None)
-        except Exception:
-            pass
-        self.stop()
-
-    @discord.ui.button(label="Non", style=ButtonStyle.secondary)
-    async def no(self, interaction: Interaction, button: Button):
-        await interaction.response.defer()
-        if interaction.user != self.member:
-            return
-        self.answer = False
-        try:
-            await interaction.message.edit(view=None)
-        except Exception:
-            pass
-        self.stop()
-
-
-class NextButtonView(View):
-    """Vue avec bouton Suivant."""
-
-    def __init__(self, member: discord.Member, messages_to_delete: list = None):
-        super().__init__(timeout=300)
-        self.member = member
-        self.messages_to_delete = messages_to_delete or []
-
-    @discord.ui.button(label="Suivant ➡️", style=ButtonStyle.primary)
-    async def next(self, interaction: Interaction, button: Button):
-        # Repondre immediatement a Discord
-        await interaction.response.defer()
-
-        # Le wait_for("interaction") dans send_charte va capter cet evenement
 
 
 class KeepOrResetView(View):
     """Vue pour choisir de conserver ou effacer les joueurs existants."""
 
-    def __init__(self, member: discord.Member):
+    def __init__(self, member: discord.Member, lang: str = "fr"):
         super().__init__(timeout=300)
         self.member = member
+        self.lang = lang
         self.keep = None
 
-    @discord.ui.button(label="Conserver", style=ButtonStyle.green)
+        self.keep_btn.label = t("profile.keep_button", lang)
+        self.reset_btn.label = t("profile.reset_button", lang)
+
+    @discord.ui.button(label="Conserver", style=ButtonStyle.green, custom_id="keep")
     async def keep_btn(self, interaction: Interaction, button: Button):
         await interaction.response.defer()
         if interaction.user != self.member:
             return
         self.keep = True
         try:
-            await interaction.message.edit(content="Joueurs conserves.", view=None)
+            await interaction.message.edit(content=t("profile.players_kept", self.lang), view=None)
         except Exception:
             pass
         self.stop()
 
-    @discord.ui.button(label="Tout effacer", style=ButtonStyle.red)
+    @discord.ui.button(label="Tout effacer", style=ButtonStyle.red, custom_id="reset")
     async def reset_btn(self, interaction: Interaction, button: Button):
         await interaction.response.defer()
         if interaction.user != self.member:
             return
         self.keep = False
         try:
-            await interaction.message.edit(content="Effacement des joueurs...", view=None)
+            await interaction.message.edit(content=t("profile.players_deleted", self.lang), view=None)
         except Exception:
             pass
         self.stop()

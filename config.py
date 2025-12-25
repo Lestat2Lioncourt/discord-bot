@@ -59,12 +59,19 @@ if not DB_CONFIG["password"]:
 # =============================================================================
 CHARTE_JSON_PATH = DATA_DIR / "charte.json"
 
-# Fichiers texte de la charte
+# Fichiers texte de la charte (ancien systeme)
 CHARTE_TEXTS = {
     "0_intro": TEXTS_DIR / "charte_0_intro.txt",
     "1_regles_generales": TEXTS_DIR / "charte_1_regles_generales.txt",
     "2_structure_roles": TEXTS_DIR / "charte_2_structure_roles.txt",
     "3_regles_fonctionnement": TEXTS_DIR / "charte_3_regles_fonctionnement.txt",
+}
+
+# Fichiers HTML de la charte (nouveau systeme)
+CHARTE_DIR = DATA_DIR / "charte"
+CHARTE_FILES = {
+    "fr": CHARTE_DIR / "charte_fr.html",
+    "en": CHARTE_DIR / "charte_en.html",
 }
 
 # =============================================================================
