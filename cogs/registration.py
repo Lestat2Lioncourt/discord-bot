@@ -79,7 +79,7 @@ class RegistrationCog(commands.Cog):
                 self.active_registrations.pop(member.name, None)
                 return
 
-            lang = view.language or "fr"
+            lang = view.language or "FR"
             logger.info(f"Langue choisie par {member.name}: {lang}")
 
             # Sauvegarder la langue
@@ -108,8 +108,8 @@ class RegistrationCog(commands.Cog):
         await dm_channel.send(t("charte.intro", lang))
         await asyncio.sleep(0.5)
 
-        # Envoyer le fichier HTML
-        charte_file = CHARTE_FILES.get(lang, CHARTE_FILES["fr"])
+        # Envoyer le fichier HTML (clés en minuscules)
+        charte_file = CHARTE_FILES.get(lang.lower(), CHARTE_FILES["fr"])
         if charte_file.exists():
             file = discord.File(charte_file, filename=f"charte_{lang}.html")
             await dm_channel.send(t("charte.instruction", lang), file=file)
@@ -524,7 +524,7 @@ class LanguageSelectView(View):
         await interaction.response.defer()
         if interaction.user != self.member:
             return
-        self.language = "fr"
+        self.language = "FR"
         try:
             await interaction.message.edit(content="🇫🇷 Francais selectionne", view=None)
         except Exception:
@@ -536,7 +536,7 @@ class LanguageSelectView(View):
         await interaction.response.defer()
         if interaction.user != self.member:
             return
-        self.language = "en"
+        self.language = "EN"
         try:
             await interaction.message.edit(content="🇬🇧 English selected", view=None)
         except Exception:

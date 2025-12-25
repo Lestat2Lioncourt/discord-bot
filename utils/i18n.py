@@ -40,7 +40,7 @@ def get_text(key: str, lang: str = None, **kwargs) -> str:
 
     Args:
         key: Cle de traduction (ex: "welcome.title", "charte.accepted")
-        lang: Code langue (fr, en). Par defaut: fr
+        lang: Code langue (fr, en, FR, EN). Par defaut: fr
         **kwargs: Variables a substituer dans le texte
 
     Returns:
@@ -49,7 +49,8 @@ def get_text(key: str, lang: str = None, **kwargs) -> str:
     if not TRANSLATIONS:
         load_translations()
 
-    lang = lang or DEFAULT_LANGUAGE
+    # Normaliser en minuscules
+    lang = (lang or DEFAULT_LANGUAGE).lower()
     if lang not in TRANSLATIONS:
         lang = DEFAULT_LANGUAGE
 

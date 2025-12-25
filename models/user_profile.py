@@ -179,8 +179,10 @@ class UserProfile:
 
     async def set_language(self, language: str) -> None:
         """Definit la langue du membre."""
-        if language not in ("fr", "en"):
-            language = "fr"
+        # Normaliser en majuscules pour la DB
+        language = language.upper() if language else "FR"
+        if language not in ("FR", "EN"):
+            language = "FR"
         query = "UPDATE user_profile SET language = $1 WHERE username = $2"
         await self.db_connection.execute(query, language, self.username)
         self.language = language
