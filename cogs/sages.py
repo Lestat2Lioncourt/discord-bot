@@ -579,23 +579,26 @@ class ValidationView(View):
         try:
             logger.info(f"Bouton Valider clique par {interaction.user.name} pour {self.username}")
 
+            # Repondre immediatement pour eviter le timeout de 3s
+            await interaction.response.defer()
+
             # Verifier que c'est un Sage (en DM, interaction.user est un User, pas un Member)
             sage_member = self._get_sage_member(interaction.user)
             if not sage_member:
-                await interaction.response.send_message("Seuls les Sages peuvent valider.", ephemeral=True)
+                await interaction.followup.send("Seuls les Sages peuvent valider.", ephemeral=True)
                 return
 
             member = self._get_member()
             if not member:
-                await interaction.response.send_message(f"Membre {self.username} non trouve sur le serveur.", ephemeral=True)
+                await interaction.followup.send(f"Membre {self.username} non trouve sur le serveur.", ephemeral=True)
                 return
 
             logger.debug(f"Membre trouve: {member.name} dans {member.guild.name}")
 
-            # Desactiver les boutons immediatement
+            # Desactiver les boutons
             self.validate_btn.disabled = True
             self.refuse_btn.disabled = True
-            await interaction.response.edit_message(view=self)
+            await interaction.edit_original_response(view=self)
 
             # Recuperer le cog pour utiliser _validate_member
             cog = self.bot.get_cog("SagesCog")
@@ -617,23 +620,26 @@ class ValidationView(View):
         try:
             logger.info(f"Bouton Refuser clique par {interaction.user.name} pour {self.username}")
 
+            # Repondre immediatement pour eviter le timeout de 3s
+            await interaction.response.defer()
+
             # Verifier que c'est un Sage (en DM, interaction.user est un User, pas un Member)
             sage_member = self._get_sage_member(interaction.user)
             if not sage_member:
-                await interaction.response.send_message("Seuls les Sages peuvent refuser.", ephemeral=True)
+                await interaction.followup.send("Seuls les Sages peuvent refuser.", ephemeral=True)
                 return
 
             member = self._get_member()
             if not member:
-                await interaction.response.send_message(f"Membre {self.username} non trouve sur le serveur.", ephemeral=True)
+                await interaction.followup.send(f"Membre {self.username} non trouve sur le serveur.", ephemeral=True)
                 return
 
             logger.debug(f"Membre trouve: {member.name} dans {member.guild.name}")
 
-            # Desactiver les boutons immediatement
+            # Desactiver les boutons
             self.validate_btn.disabled = True
             self.refuse_btn.disabled = True
-            await interaction.response.edit_message(view=self)
+            await interaction.edit_original_response(view=self)
 
             # Recuperer le cog pour utiliser _refuse_member
             cog = self.bot.get_cog("SagesCog")
