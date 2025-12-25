@@ -566,13 +566,22 @@ class ValidationView(View):
                 return member
         return None
 
+    def _get_sage_member(self, user: discord.User) -> Optional[discord.Member]:
+        """Retrouve le membre Sage dans une guilde."""
+        for guild in self.bot.guilds:
+            member = guild.get_member(user.id)
+            if member and is_sage(member):
+                return member
+        return None
+
     @discord.ui.button(label="Valider", style=ButtonStyle.success, emoji="✅")
     async def validate_btn(self, interaction: Interaction, button: Button):
         try:
             logger.info(f"Bouton Valider clique par {interaction.user.name} pour {self.username}")
 
-            # Verifier que c'est un Sage
-            if not is_sage(interaction.user):
+            # Verifier que c'est un Sage (en DM, interaction.user est un User, pas un Member)
+            sage_member = self._get_sage_member(interaction.user)
+            if not sage_member:
                 await interaction.response.send_message("Seuls les Sages peuvent valider.", ephemeral=True)
                 return
 
@@ -608,8 +617,9 @@ class ValidationView(View):
         try:
             logger.info(f"Bouton Refuser clique par {interaction.user.name} pour {self.username}")
 
-            # Verifier que c'est un Sage
-            if not is_sage(interaction.user):
+            # Verifier que c'est un Sage (en DM, interaction.user est un User, pas un Member)
+            sage_member = self._get_sage_member(interaction.user)
+            if not sage_member:
                 await interaction.response.send_message("Seuls les Sages peuvent refuser.", ephemeral=True)
                 return
 
