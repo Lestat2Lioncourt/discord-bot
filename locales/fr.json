@@ -24,14 +24,14 @@
 
   "profile": {
     "title": "# 4️⃣ Complete ton profil",
-    "existing_players": "**Tu as deja des joueurs enregistres :**",
-    "keep_or_reset": "Veux-tu les **conserver** ou **tout effacer** et recommencer ?",
+    "existing_players": "**Des informations sont deja enregistrees :**",
+    "keep_or_reset": "Veux-tu **conserver** ces informations ou **tout effacer** et recommencer ?",
     "choose_option": "Choisis une option :",
     "keep_button": "Conserver",
     "reset_button": "Tout effacer",
-    "players_kept": "Joueurs conserves.",
-    "players_deleted": "Effacement des joueurs...",
-    "players_cleared": "Joueurs effaces. On recommence..."
+    "players_kept": "Informations conservees.",
+    "players_deleted": "Effacement en cours...",
+    "players_cleared": "Informations effacees. On recommence..."
   },
 
   "players": {

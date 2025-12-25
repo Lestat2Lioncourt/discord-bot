@@ -154,19 +154,36 @@ class RegistrationCog(commands.Cog):
         await dm_channel.send(t("profile.title", lang))
         await asyncio.sleep(0.5)
 
-        # Verifier si le membre a deja des joueurs enregistres
+        # Verifier si le membre a deja des infos enregistrees
         existing_players = await Player.get_by_member(self.bot.db_pool, username)
 
-        if existing_players:
-            # Afficher les joueurs existants
-            team1 = [p.player_name for p in existing_players if p.team_name == "This Is PSG"]
-            team2 = [p.player_name for p in existing_players if p.team_name == "This Is PSG 2"]
+        async with self.bot.db_pool.acquire() as conn:
+            profile = await UserProfile.get_or_create_user(username, conn, member)
+            await profile.load_from_db()
 
-            msg = t("profile.existing_players", lang) + "\n"
-            if team1:
-                msg += f"• This Is PSG : {', '.join(team1)}\n"
-            if team2:
-                msg += f"• This Is PSG 2 : {', '.join(team2)}\n"
+        has_existing_data = existing_players or profile.localisation
+
+        if has_existing_data:
+            # Afficher les infos existantes
+            if lang.upper() == "FR":
+                msg = "**Des informations sont deja enregistrees :**\n"
+            else:
+                msg = "**Some information is already registered:**\n"
+
+            if existing_players:
+                team1 = [p.player_name for p in existing_players if p.team_name == "This Is PSG"]
+                team2 = [p.player_name for p in existing_players if p.team_name == "This Is PSG 2"]
+                if team1:
+                    msg += f"• This Is PSG : {', '.join(team1)}\n"
+                if team2:
+                    msg += f"• This Is PSG 2 : {', '.join(team2)}\n"
+
+            if profile.localisation:
+                coords = ""
+                if profile.latitude and profile.longitude:
+                    coords = f" ({profile.latitude:.4f}, {profile.longitude:.4f})"
+                msg += f"• 📍 {profile.localisation}{coords}\n"
+
             msg += "\n" + t("profile.keep_or_reset", lang)
 
             await dm_channel.send(msg)
@@ -180,8 +197,15 @@ class RegistrationCog(commands.Cog):
                 await dm_channel.send(t("profile.players_kept", lang))
                 view.keep = True
 
-            if not view.keep:
+            if view.keep:
+                # Conserver les infos -> passer directement a la fin
+                await self.finish_registration(member, dm_channel, lang)
+                return
+            else:
+                # Effacer les joueurs et la localisation
                 await Player.delete_all_for_member(self.bot.db_pool, username)
+                if profile.localisation:
+                    await profile.clear_location()
                 await dm_channel.send(t("profile.players_cleared", lang))
                 await asyncio.sleep(0.5)
 

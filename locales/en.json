@@ -24,14 +24,14 @@
 
   "profile": {
     "title": "# 4️⃣ Complete your profile",
-    "existing_players": "**You already have registered players:**",
-    "keep_or_reset": "Do you want to **keep** them or **delete all** and start over?",
+    "existing_players": "**Some information is already registered:**",
+    "keep_or_reset": "Do you want to **keep** this information or **delete all** and start over?",
     "choose_option": "Choose an option:",
     "keep_button": "Keep",
     "reset_button": "Delete all",
-    "players_kept": "Players kept.",
-    "players_deleted": "Deleting players...",
-    "players_cleared": "Players deleted. Starting over..."
+    "players_kept": "Information kept.",
+    "players_deleted": "Deleting...",
+    "players_cleared": "Information deleted. Starting over..."
   },
 
   "players": {
