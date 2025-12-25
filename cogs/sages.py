@@ -19,6 +19,7 @@ from models.player import Player
 from utils.logger import get_logger
 from utils.roles import is_sage, promote_to_membre, demote_to_newbie
 from utils.i18n import t
+from utils.map_generator import regenerate_map_if_needed
 from config import CHANNEL_GENERAL_ID, CHANNEL_SAGE_ID, DEBUG_MODE, DEBUG_USER
 
 logger = get_logger("cogs.sages")
@@ -178,6 +179,9 @@ class SagesCog(commands.Cog):
                 except discord.Forbidden:
                     pass
 
+                # Regenerer la carte (le nouveau membre peut avoir une localisation)
+                await regenerate_map_if_needed(self.bot.db_pool)
+
                 logger.info(f"{username} valide par {sage.name} (bouton)")
             else:
                 await interaction.followup.send(f"Erreur lors de la promotion de {member.mention}.", ephemeral=True)
@@ -267,6 +271,9 @@ class SagesCog(commands.Cog):
                 await member.send(t("finish.approved", member_lang, sage_name=sage.display_name))
             except discord.Forbidden:
                 logger.warning(f"Impossible d'envoyer DM a {username}")
+
+            # Regenerer la carte (le nouveau membre peut avoir une localisation)
+            await regenerate_map_if_needed(self.bot.db_pool)
 
             logger.info(f"{username} valide par {sage.name}")
             return True

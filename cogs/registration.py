@@ -24,6 +24,7 @@ from utils.logger import get_logger
 from utils.roles import is_newbie, is_membre, is_sage
 from utils.i18n import t, Translator
 from cogs.sages import notify_sages_new_registration, notify_sages_returning_member
+from utils.map_generator import regenerate_map_if_needed
 from config import CHARTE_FILES, DATA_DIR, CHANNEL_ACCUEIL_ID
 
 logger = get_logger("cogs.registration")
@@ -558,6 +559,10 @@ class RegistrationCog(commands.Cog):
                 async with self.bot.db_pool.acquire() as conn:
                     profile = await UserProfile.get_or_create_user(username, conn, ctx.author)
                     await profile.set_location(location, loc.latitude, loc.longitude)
+
+                # Regenerer la carte si le membre est approuve
+                if profile.is_approved():
+                    await regenerate_map_if_needed(self.bot.db_pool)
 
                 await ctx.send(t("location.saved", lang, address=loc.address))
             else:
