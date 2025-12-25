@@ -65,33 +65,40 @@ class RegistrationCog(commands.Cog):
 
     async def ask_language(self, member: discord.Member, dm_channel: discord.DMChannel):
         """Demande la langue preferee."""
-        view = LanguageSelectView(member)
-        await dm_channel.send(
-            "**Choisis ta langue / Select your language**",
-            view=view
-        )
-
         try:
-            await asyncio.wait_for(view.wait(), timeout=300)
-        except asyncio.TimeoutError:
-            await dm_channel.send("Temps ecoule / Time expired.")
-            self.active_registrations.pop(member.name, None)
-            return
+            view = LanguageSelectView(member)
+            await dm_channel.send(
+                "**Choisis ta langue / Select your language**",
+                view=view
+            )
 
-        lang = view.language or "fr"
+            try:
+                await asyncio.wait_for(view.wait(), timeout=300)
+            except asyncio.TimeoutError:
+                await dm_channel.send("Temps ecoule / Time expired.")
+                self.active_registrations.pop(member.name, None)
+                return
 
-        # Sauvegarder la langue
-        async with self.bot.db_pool.acquire() as conn:
-            profile = await UserProfile.get_or_create_user(member.name, conn, member)
-            await profile.set_language(lang)
+            lang = view.language or "fr"
+            logger.info(f"Langue choisie par {member.name}: {lang}")
 
-        # Message de bienvenue
-        await dm_channel.send(t("welcome.title", lang, display_name=member.display_name))
-        await dm_channel.send(t("welcome.intro", lang))
-        await asyncio.sleep(1)
+            # Sauvegarder la langue
+            async with self.bot.db_pool.acquire() as conn:
+                profile = await UserProfile.get_or_create_user(member.name, conn, member)
+                await profile.set_language(lang)
+            logger.info(f"Langue sauvegardee pour {member.name}")
 
-        # Etape 2: Charte
-        await self.send_charte(member, dm_channel, lang)
+            # Message de bienvenue
+            await dm_channel.send(t("welcome.title", lang, display_name=member.display_name))
+            await dm_channel.send(t("welcome.intro", lang))
+            await asyncio.sleep(1)
+
+            # Etape 2: Charte
+            await self.send_charte(member, dm_channel, lang)
+
+        except Exception as e:
+            logger.error(f"Erreur dans ask_language pour {member.name}: {e}", exc_info=True)
+            await dm_channel.send(f"Erreur: {e}")
 
     async def send_charte(self, member: discord.Member, dm_channel: discord.DMChannel, lang: str):
         """Envoie la charte en fichier HTML et demande validation."""
