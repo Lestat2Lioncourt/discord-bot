@@ -23,7 +23,7 @@ from utils.database import Database
 from utils.logger import get_logger
 from utils.roles import is_newbie, is_membre, is_sage
 from utils.i18n import t, Translator
-from cogs.sages import notify_sages_new_registration
+from cogs.sages import notify_sages_new_registration, notify_sages_returning_member
 from config import CHARTE_FILES, DATA_DIR, CHANNEL_ACCUEIL_ID
 
 logger = get_logger("cogs.registration")
@@ -387,6 +387,13 @@ class RegistrationCog(commands.Cog):
 
         # Notifier les Sages
         await notify_sages_new_registration(self.bot, member, profile, players)
+
+        # Verifier si c'est un revenant (ancien membre avec nouveau username)
+        returning_info = await UserProfile.check_returning_member(
+            self.bot.db_pool, member.id, username
+        )
+        if returning_info:
+            await notify_sages_returning_member(self.bot, member, returning_info)
 
     @commands.command(name="inscription")
     async def cmd_inscription(self, ctx):

@@ -367,3 +367,53 @@ class UserProfile:
             f"discord_name={self.discord_name}, charte_validated={self.charte_validated}, "
             f"approval_status={self.approval_status})"
         )
+
+    @staticmethod
+    async def get_username_history(db_pool, discord_id: int) -> list:
+        """Recupere l'historique des usernames pour un discord_id."""
+        query = """
+        SELECT username, discord_name, changed_at
+        FROM username_history
+        WHERE discord_id = $1
+        ORDER BY changed_at DESC
+        """
+        async with db_pool.acquire() as conn:
+            rows = await conn.fetch(query, discord_id)
+            return [dict(row) for row in rows]
+
+    @staticmethod
+    async def check_returning_member(db_pool, discord_id: int, current_username: str) -> Optional[dict]:
+        """
+        Verifie si un membre est un 'revenant' (ancien membre avec nouveau username).
+
+        Retourne un dict avec les infos si c'est un revenant, None sinon.
+        """
+        async with db_pool.acquire() as conn:
+            # Verifier si ce discord_id a deja un historique
+            query = """
+            SELECT username, discord_name, changed_at
+            FROM username_history
+            WHERE discord_id = $1 AND LOWER(username) != LOWER($2)
+            ORDER BY changed_at DESC
+            LIMIT 1
+            """
+            row = await conn.fetchrow(query, discord_id, current_username)
+
+            if row:
+                # C'est un revenant - recuperer aussi le statut precedent
+                status_query = """
+                SELECT approval_status, charte_validated
+                FROM user_profile
+                WHERE discord_id = $1
+                """
+                status = await conn.fetchrow(status_query, discord_id)
+
+                return {
+                    "old_username": row['username'],
+                    "old_discord_name": row['discord_name'],
+                    "last_seen": row['changed_at'],
+                    "previous_status": status['approval_status'] if status else None,
+                    "had_validated_charte": status['charte_validated'] if status else False
+                }
+
+            return None

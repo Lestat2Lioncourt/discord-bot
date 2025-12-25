@@ -729,6 +729,87 @@ async def notify_sages_new_registration(bot, member: discord.Member, profile, pl
         logger.warning("Salon des Sages non trouve")
 
 
+async def notify_sages_returning_member(bot, member: discord.Member, returning_info: dict):
+    """
+    Alerte les Sages quand un 'revenant' est detecte.
+
+    Un revenant est un membre qui revient avec un nouveau username Discord.
+    """
+    logger.info(f"Revenant detecte: {member.name} (ancien: {returning_info['old_username']})")
+
+    # Couleur selon le statut precedent
+    if returning_info['previous_status'] == 'refused':
+        color = discord.Color.red()
+        status_emoji = "🚫"
+        status_text = "REFUSE precedemment"
+    elif returning_info['previous_status'] == 'approved':
+        color = discord.Color.green()
+        status_emoji = "✅"
+        status_text = "Ancien membre approuve"
+    else:
+        color = discord.Color.orange()
+        status_emoji = "⚠️"
+        status_text = "Etait en attente"
+
+    embed = discord.Embed(
+        title=f"{status_emoji} Revenant detecte!",
+        description=f"**{member.display_name}** (@{member.name}) a deja ete vu sur ce serveur.",
+        color=color
+    )
+
+    embed.add_field(
+        name="Ancien username",
+        value=f"`{returning_info['old_username']}`",
+        inline=True
+    )
+
+    if returning_info['old_discord_name']:
+        embed.add_field(
+            name="Ancien pseudo",
+            value=returning_info['old_discord_name'],
+            inline=True
+        )
+
+    embed.add_field(
+        name="Statut precedent",
+        value=status_text,
+        inline=True
+    )
+
+    if returning_info['last_seen']:
+        embed.add_field(
+            name="Derniere activite",
+            value=returning_info['last_seen'].strftime("%d/%m/%Y"),
+            inline=True
+        )
+
+    embed.set_footer(text="Verifiez l'historique avant de valider")
+
+    # Envoyer la notification (meme logique que pour les inscriptions)
+    if DEBUG_MODE:
+        for guild in bot.guilds:
+            debug_member = discord.utils.find(
+                lambda m: m.name.lower() == DEBUG_USER.lower(),
+                guild.members
+            )
+            if debug_member:
+                try:
+                    await debug_member.send(embed=embed)
+                    logger.info(f"Alerte revenant envoyee a {DEBUG_USER} (debug)")
+                except discord.Forbidden:
+                    logger.warning(f"Impossible d'envoyer DM a {DEBUG_USER}")
+                return
+    else:
+        for guild in bot.guilds:
+            sage_channel = guild.get_channel(CHANNEL_SAGE_ID)
+            if sage_channel:
+                await sage_channel.send(embed=embed)
+                logger.info("Alerte revenant envoyee dans le salon des Sages")
+                return
+
+        logger.warning("Salon des Sages non trouve pour alerte revenant")
+
+
 async def setup(bot):
     """Ajoute le cog au bot."""
     await bot.add_cog(SagesCog(bot))
