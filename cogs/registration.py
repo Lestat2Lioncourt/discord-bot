@@ -362,8 +362,6 @@ class RegistrationCog(commands.Cog):
         )
 
         await dm_channel.send(summary)
-
-        # Notifier les sages (sera ameliore en Phase 6)
         logger.info(f"Inscription terminee pour {username}, en attente de validation")
 
     @commands.command(name="inscription")
