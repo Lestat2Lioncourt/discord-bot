@@ -123,71 +123,91 @@ class SagesCog(commands.Cog):
 
     async def _do_validate(self, interaction: Interaction, member: discord.Member):
         """Validation depuis un bouton (interaction deja repondue)."""
-        sage = interaction.user
-        username = member.name
+        try:
+            sage = interaction.user
+            username = member.name
+            logger.debug(f"_do_validate: debut pour {username}")
 
-        async with self.bot.db_pool.acquire() as conn:
-            profile = await UserProfile.get_or_create_user(username, conn, member)
-            member_lang = profile.language or "FR"
+            async with self.bot.db_pool.acquire() as conn:
+                profile = await UserProfile.get_or_create_user(username, conn, member)
+                member_lang = profile.language or "FR"
 
-            if profile.approval_status == "approved":
-                await interaction.followup.send(f"{member.mention} est deja approuve.", ephemeral=True)
-                return
+                if profile.approval_status == "approved":
+                    await interaction.followup.send(f"{member.mention} est deja approuve.", ephemeral=True)
+                    return
 
-            if not profile.charte_validated:
-                await interaction.followup.send(f"{member.mention} n'a pas valide la charte.", ephemeral=True)
-                return
+                if not profile.charte_validated:
+                    await interaction.followup.send(f"{member.mention} n'a pas valide la charte.", ephemeral=True)
+                    return
 
-            await profile.approve()
+                await profile.approve()
+                logger.debug(f"_do_validate: profil approuve pour {username}")
 
-        success = await promote_to_membre(member)
+            success = await promote_to_membre(member)
+            logger.debug(f"_do_validate: promote_to_membre = {success}")
 
-        if success:
-            await interaction.followup.send(f"{member.mention} a ete valide!")
+            if success:
+                await interaction.followup.send(f"{member.mention} a ete valide!")
 
-            guild = member.guild
-            if guild:
-                accueil_channel = guild.get_channel(CHANNEL_ACCUEIL_ID)
-                if accueil_channel:
-                    await accueil_channel.send(
-                        t("sages_cmd.welcome_public", member_lang, member=member.mention, guild=guild.name)
-                    )
+                guild = member.guild
+                if guild:
+                    accueil_channel = guild.get_channel(CHANNEL_ACCUEIL_ID)
+                    if accueil_channel:
+                        await accueil_channel.send(
+                            t("sages_cmd.welcome_public", member_lang, member=member.mention, guild=guild.name)
+                        )
 
+                try:
+                    await member.send(t("finish.approved", member_lang, sage_name=sage.display_name))
+                except discord.Forbidden:
+                    pass
+
+                logger.info(f"{username} valide par {sage.name} (bouton)")
+            else:
+                await interaction.followup.send(f"Erreur lors de la promotion de {member.mention}.", ephemeral=True)
+
+        except Exception as e:
+            logger.error(f"_do_validate erreur: {e}", exc_info=True)
             try:
-                await member.send(t("finish.approved", member_lang, sage_name=sage.display_name))
-            except discord.Forbidden:
+                await interaction.followup.send(f"Erreur: {e}", ephemeral=True)
+            except:
                 pass
-
-            logger.info(f"{username} valide par {sage.name} (bouton)")
-        else:
-            await interaction.followup.send(f"Erreur lors de la promotion de {member.mention}.", ephemeral=True)
 
     async def _do_refuse(self, interaction: Interaction, member: discord.Member):
         """Refus depuis un bouton (interaction deja repondue)."""
-        sage = interaction.user
-        username = member.name
-
-        async with self.bot.db_pool.acquire() as conn:
-            profile = await UserProfile.get_or_create_user(username, conn, member)
-            member_lang = profile.language or "FR"
-
-            if profile.approval_status == "refused":
-                await interaction.followup.send(f"{member.mention} est deja refuse.", ephemeral=True)
-                return
-
-            await profile.refuse()
-
-        await demote_to_newbie(member)
-        await interaction.followup.send(f"{member.mention} a ete refuse.")
-
         try:
-            dm_msg = t("finish.refused", member_lang)
-            dm_msg += "\n\n" + t("finish.refused_contact", member_lang)
-            await member.send(dm_msg)
-        except discord.Forbidden:
-            pass
+            sage = interaction.user
+            username = member.name
+            logger.debug(f"_do_refuse: debut pour {username}")
 
-        logger.info(f"{username} refuse par {sage.name} (bouton)")
+            async with self.bot.db_pool.acquire() as conn:
+                profile = await UserProfile.get_or_create_user(username, conn, member)
+                member_lang = profile.language or "FR"
+
+                if profile.approval_status == "refused":
+                    await interaction.followup.send(f"{member.mention} est deja refuse.", ephemeral=True)
+                    return
+
+                await profile.refuse()
+
+            await demote_to_newbie(member)
+            await interaction.followup.send(f"{member.mention} a ete refuse.")
+
+            try:
+                dm_msg = t("finish.refused", member_lang)
+                dm_msg += "\n\n" + t("finish.refused_contact", member_lang)
+                await member.send(dm_msg)
+            except discord.Forbidden:
+                pass
+
+            logger.info(f"{username} refuse par {sage.name} (bouton)")
+
+        except Exception as e:
+            logger.error(f"_do_refuse erreur: {e}", exc_info=True)
+            try:
+                await interaction.followup.send(f"Erreur: {e}", ephemeral=True)
+            except:
+                pass
 
     async def _validate_member(self, ctx, member: discord.Member, sage_lang: str, sage: discord.Member = None):
         """Logique de validation d'un membre (commande uniquement)."""
@@ -548,48 +568,77 @@ class ValidationView(View):
 
     @discord.ui.button(label="Valider", style=ButtonStyle.success, emoji="✅")
     async def validate_btn(self, interaction: Interaction, button: Button):
-        # Verifier que c'est un Sage
-        if not is_sage(interaction.user):
-            await interaction.response.send_message("Seuls les Sages peuvent valider.", ephemeral=True)
-            return
+        try:
+            logger.info(f"Bouton Valider clique par {interaction.user.name} pour {self.username}")
 
-        member = self._get_member()
-        if not member:
-            await interaction.response.send_message(f"Membre {self.username} non trouve sur le serveur.", ephemeral=True)
-            return
+            # Verifier que c'est un Sage
+            if not is_sage(interaction.user):
+                await interaction.response.send_message("Seuls les Sages peuvent valider.", ephemeral=True)
+                return
 
-        # Desactiver les boutons immediatement
-        self.validate_btn.disabled = True
-        self.refuse_btn.disabled = True
-        await interaction.response.edit_message(view=self)
+            member = self._get_member()
+            if not member:
+                await interaction.response.send_message(f"Membre {self.username} non trouve sur le serveur.", ephemeral=True)
+                return
 
-        # Recuperer le cog pour utiliser _validate_member
-        cog = self.bot.get_cog("SagesCog")
-        if cog:
-            # Utiliser un contexte factice pour la validation
-            await cog._do_validate(interaction, member)
+            logger.debug(f"Membre trouve: {member.name} dans {member.guild.name}")
+
+            # Desactiver les boutons immediatement
+            self.validate_btn.disabled = True
+            self.refuse_btn.disabled = True
+            await interaction.response.edit_message(view=self)
+
+            # Recuperer le cog pour utiliser _validate_member
+            cog = self.bot.get_cog("SagesCog")
+            if cog:
+                await cog._do_validate(interaction, member)
+            else:
+                logger.error("SagesCog non trouve!")
+                await interaction.followup.send("Erreur interne: cog non trouve.", ephemeral=True)
+
+        except Exception as e:
+            logger.error(f"Erreur bouton Valider: {e}", exc_info=True)
+            try:
+                await interaction.followup.send(f"Erreur: {e}", ephemeral=True)
+            except:
+                pass
 
     @discord.ui.button(label="Refuser", style=ButtonStyle.danger, emoji="❌")
     async def refuse_btn(self, interaction: Interaction, button: Button):
-        # Verifier que c'est un Sage
-        if not is_sage(interaction.user):
-            await interaction.response.send_message("Seuls les Sages peuvent refuser.", ephemeral=True)
-            return
+        try:
+            logger.info(f"Bouton Refuser clique par {interaction.user.name} pour {self.username}")
 
-        member = self._get_member()
-        if not member:
-            await interaction.response.send_message(f"Membre {self.username} non trouve sur le serveur.", ephemeral=True)
-            return
+            # Verifier que c'est un Sage
+            if not is_sage(interaction.user):
+                await interaction.response.send_message("Seuls les Sages peuvent refuser.", ephemeral=True)
+                return
 
-        # Desactiver les boutons immediatement
-        self.validate_btn.disabled = True
-        self.refuse_btn.disabled = True
-        await interaction.response.edit_message(view=self)
+            member = self._get_member()
+            if not member:
+                await interaction.response.send_message(f"Membre {self.username} non trouve sur le serveur.", ephemeral=True)
+                return
 
-        # Recuperer le cog pour utiliser _refuse_member
-        cog = self.bot.get_cog("SagesCog")
-        if cog:
-            await cog._do_refuse(interaction, member)
+            logger.debug(f"Membre trouve: {member.name} dans {member.guild.name}")
+
+            # Desactiver les boutons immediatement
+            self.validate_btn.disabled = True
+            self.refuse_btn.disabled = True
+            await interaction.response.edit_message(view=self)
+
+            # Recuperer le cog pour utiliser _refuse_member
+            cog = self.bot.get_cog("SagesCog")
+            if cog:
+                await cog._do_refuse(interaction, member)
+            else:
+                logger.error("SagesCog non trouve!")
+                await interaction.followup.send("Erreur interne: cog non trouve.", ephemeral=True)
+
+        except Exception as e:
+            logger.error(f"Erreur bouton Refuser: {e}", exc_info=True)
+            try:
+                await interaction.followup.send(f"Erreur: {e}", ephemeral=True)
+            except:
+                pass
 
 
 async def notify_sages_new_registration(bot, member: discord.Member, profile, players: list):
