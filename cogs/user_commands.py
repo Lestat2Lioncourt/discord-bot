@@ -270,8 +270,8 @@ class UserCommandsCog(commands.Cog):
 
             # Envoyer le lien ou le fichier selon la config
             if WEB_URL:
-                # Serveur web configure -> envoyer le lien
-                carte_url = f"{WEB_URL.rstrip('/')}/carte"
+                # Envoyer le lien vers la carte hebergee
+                carte_url = WEB_URL
                 embed = discord.Embed(
                     title="🗺️ Carte des membres",
                     description=f"**{len(members_data)}** membres localisés",
