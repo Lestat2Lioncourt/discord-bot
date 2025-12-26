@@ -399,12 +399,12 @@
             document.getElementById('content-' + lang).classList.add('active');
             document.getElementById('btn-' + lang).classList.add('active');
 
-            localStorage.setItem('charte-lang', lang);
+            localStorage.setItem('site-lang', lang);
             document.documentElement.lang = lang;
         }
 
         // Load saved language preference
-        const savedLang = localStorage.getItem('charte-lang');
+        const savedLang = localStorage.getItem('site-lang');
         if (savedLang) {
             setLang(savedLang);
         }
