@@ -53,6 +53,7 @@
     "intro": "📍 Permet de t'afficher sur la **carte des membres**.\n\nTu peux etre plus ou moins precis :\n• Simple : pays ou region (*France*, *Bretagne*)\n• Precis : ville ou adresse (*Paris*, *75001 Paris*)\n\nSaisis ta localisation ou `.` pour passer :",
     "searching": "Recherche de la localisation...",
     "saved": "Localisation enregistree : **{address}**",
+    "map_update": "🗺️ *La carte des membres sera mise a jour dans ~2 minutes.*",
     "not_found": "Localisation non trouvee. Tu pourras la modifier plus tard avec `!profil`.",
     "service_error": "Service de localisation indisponible. Tu pourras reessayer plus tard.",
     "error": "Erreur lors de la localisation. Tu pourras reessayer plus tard.",

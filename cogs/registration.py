@@ -340,6 +340,7 @@ class RegistrationCog(commands.Cog):
 
                 coords_info = f"\n📍 Coordonnees: {loc.latitude:.4f}, {loc.longitude:.4f}"
                 await dm_channel.send(t("location.saved", lang, address=loc.address) + coords_info)
+                await dm_channel.send(t("location.map_update", lang))
             else:
                 await dm_channel.send(t("location.not_found", lang))
 
@@ -563,8 +564,10 @@ class RegistrationCog(commands.Cog):
                 # Regenerer la carte si le membre est approuve
                 if profile.is_approved():
                     await regenerate_map_if_needed(self.bot.db_pool)
-
-                await ctx.send(t("location.saved", lang, address=loc.address))
+                    await ctx.send(t("location.saved", lang, address=loc.address))
+                    await ctx.send(t("location.map_update", lang))
+                else:
+                    await ctx.send(t("location.saved", lang, address=loc.address))
             else:
                 await ctx.send(t("location.not_found", lang))
 

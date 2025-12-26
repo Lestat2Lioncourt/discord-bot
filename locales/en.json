@@ -53,6 +53,7 @@
     "intro": "📍 Allows you to appear on the **members map**.\n\nYou can be more or less precise:\n• Simple: country or region (*France*, *Brittany*)\n• Precise: city or address (*Paris*, *75001 Paris*)\n\nEnter your location or `.` to skip:",
     "searching": "Searching for location...",
     "saved": "Location saved: **{address}**",
+    "map_update": "🗺️ *The members map will be updated in ~2 minutes.*",
     "not_found": "Location not found. You can change it later with `!profil`.",
     "service_error": "Location service unavailable. You can try again later.",
     "error": "Error during location search. You can try again later.",
