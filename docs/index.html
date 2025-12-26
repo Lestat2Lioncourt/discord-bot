@@ -28,9 +28,38 @@
             padding: 20px 20px 10px;
         }
 
+        .lang-toggle {
+            display: flex;
+            justify-content: flex-end;
+            gap: 5px;
+            margin-bottom: 10px;
+        }
+
+        .lang-btn {
+            padding: 6px 14px;
+            border: none;
+            background: rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.7);
+            cursor: pointer;
+            border-radius: 15px;
+            font-size: 0.85em;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .lang-btn.active {
+            background: rgba(255, 255, 255, 0.25);
+            color: white;
+        }
+
+        .lang-btn:hover:not(.active) {
+            background: rgba(255, 255, 255, 0.15);
+            color: white;
+        }
+
         header {
             text-align: center;
-            padding: 20px 0 15px;
+            padding: 0 0 15px;
         }
 
         .banner {
@@ -38,13 +67,6 @@
             height: auto;
             border-radius: 16px;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-            margin-bottom: 20px;
-        }
-
-        .subtitle {
-            font-size: 1.2em;
-            opacity: 0.9;
-            font-weight: 300;
         }
 
         .cards {
@@ -81,12 +103,6 @@
             font-size: 1.4em;
             margin-bottom: 10px;
             font-weight: 600;
-        }
-
-        .card p {
-            opacity: 0.8;
-            font-size: 0.95em;
-            line-height: 1.5;
         }
 
         .card.disabled {
@@ -130,6 +146,11 @@
 </head>
 <body>
     <div class="container">
+        <div class="lang-toggle">
+            <button class="lang-btn active" onclick="setLang('fr')" id="btn-fr">FR</button>
+            <button class="lang-btn" onclick="setLang('en')" id="btn-en">EN</button>
+        </div>
+
         <header>
             <img src="images/Bandeau%20This%20Is%20PSG.png" alt="This Is PSG" class="banner">
         </header>
@@ -137,24 +158,45 @@
         <div class="cards">
             <a href="carte.html" class="card">
                 <div class="card-icon">🗺️</div>
-                <h2>Carte des membres</h2>
+                <h2 data-fr="Carte des membres" data-en="Members map">Carte des membres</h2>
             </a>
 
             <div class="card disabled">
                 <div class="card-icon">📊</div>
-                <h2>Statistiques</h2>
-                <span class="badge">Bientot disponible</span>
+                <h2 data-fr="Statistiques" data-en="Statistics">Statistiques</h2>
+                <span class="badge" data-fr="Bientot disponible" data-en="Coming soon">Bientot disponible</span>
             </div>
 
             <a href="charte.html" class="card">
                 <div class="card-icon">📜</div>
-                <h2>Charte du clan</h2>
+                <h2 data-fr="Notre charte" data-en="Our charter">Notre charte</h2>
             </a>
         </div>
     </div>
 
     <footer>
-        <p>This Is PSG &copy; 2025 | <a href="https://discord.gg/dEV34pC5um">Rejoindre le Discord</a></p>
+        <p><span data-fr="This Is PSG &copy; 2025 |" data-en="This Is PSG &copy; 2025 |">This Is PSG &copy; 2025 |</span> <a href="https://discord.gg/dEV34pC5um" data-fr="Rejoindre le Discord" data-en="Join Discord">Rejoindre le Discord</a></p>
     </footer>
+
+    <script>
+        function setLang(lang) {
+            document.getElementById('btn-fr').classList.remove('active');
+            document.getElementById('btn-en').classList.remove('active');
+            document.getElementById('btn-' + lang).classList.add('active');
+
+            document.querySelectorAll('[data-fr][data-en]').forEach(el => {
+                el.innerHTML = el.getAttribute('data-' + lang);
+            });
+
+            localStorage.setItem('site-lang', lang);
+            document.documentElement.lang = lang;
+        }
+
+        // Load saved language preference
+        const savedLang = localStorage.getItem('site-lang');
+        if (savedLang) {
+            setLang(savedLang);
+        }
+    </script>
 </body>
 </html>
