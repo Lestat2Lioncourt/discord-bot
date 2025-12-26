@@ -21,6 +21,7 @@ logger = get_logger("utils.map_generator")
 MAP_TEMPLATE_PATH = DATA_DIR / "map_template.html"
 MAP_OUTPUT_PATH = TEMP_DIR / "carte_membres.html"
 GITHUB_PAGES_PATH = BASE_DIR / "docs" / "carte.html"
+CARTE_META_PATH = BASE_DIR / "docs" / "carte_meta.json"
 
 # Configuration GitHub Pages (activee par defaut si le dossier docs/ existe)
 GITHUB_PAGES_ENABLED = GITHUB_PAGES_PATH.parent.exists()
@@ -100,20 +101,30 @@ async def generate_map(db_pool) -> Optional[Path]:
 async def publish_to_github_pages(html_content: str, member_count: int):
     """
     Publie la carte sur GitHub Pages.
-    Sauvegarde dans docs/index.html et fait un commit/push.
+    Sauvegarde dans docs/carte.html et fait un commit/push.
     """
     try:
-        # Sauvegarder le fichier
+        now = datetime.now()
+
+        # Sauvegarder le fichier HTML
         GITHUB_PAGES_PATH.parent.mkdir(parents=True, exist_ok=True)
         with open(GITHUB_PAGES_PATH, "w", encoding="utf-8") as f:
             f.write(html_content)
 
+        # Sauvegarder les metadonnees (pour affichage sur index.html)
+        meta_data = {
+            "last_update": now.strftime("%d/%m/%Y %H:%M"),
+            "member_count": member_count
+        }
+        with open(CARTE_META_PATH, "w", encoding="utf-8") as f:
+            json.dump(meta_data, f)
+
         # Commit et push
-        commit_msg = f"Update carte: {member_count} membres - {datetime.now().strftime('%d/%m/%Y %H:%M')}"
+        commit_msg = f"Update carte: {member_count} membres - {now.strftime('%d/%m/%Y %H:%M')}"
 
         # Executer les commandes git
         subprocess.run(
-            ["git", "add", "docs/carte.html"],
+            ["git", "add", "docs/carte.html", "docs/carte_meta.json"],
             cwd=BASE_DIR,
             capture_output=True,
             check=True

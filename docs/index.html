@@ -159,6 +159,7 @@
             <a href="carte.html" class="card">
                 <div class="card-icon">🗺️</div>
                 <h2 data-fr="Carte des membres" data-en="Members map">Carte des membres</h2>
+                <small id="carte-update" style="opacity: 0.6; font-size: 0.8em;"></small>
             </a>
 
             <div class="card disabled">
@@ -190,12 +191,27 @@
 
             localStorage.setItem('site-lang', lang);
             document.documentElement.lang = lang;
+
+            // Update carte date prefix
+            updateCarteDate(lang);
         }
 
-        // Load saved language preference
-        const savedLang = localStorage.getItem('site-lang');
-        if (savedLang) {
+        function updateCarteDate(lang) {
+            fetch('carte_meta.json')
+                .then(r => r.json())
+                .then(data => {
+                    const prefix = lang === 'fr' ? 'maj' : 'updated';
+                    document.getElementById('carte-update').textContent = `(${prefix} ${data.last_update})`;
+                })
+                .catch(() => {});
+        }
+
+        // Load saved language preference and carte date
+        const savedLang = localStorage.getItem('site-lang') || 'fr';
+        if (savedLang !== 'fr') {
             setLang(savedLang);
+        } else {
+            updateCarteDate('fr');
         }
     </script>
 </body>
