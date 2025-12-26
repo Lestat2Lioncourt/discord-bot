@@ -12,6 +12,7 @@ from datetime import datetime
 
 from config import CHARTE_JSON_PATH, DATA_DIR, TEMP_DIR, WEB_URL
 from models.player import Player
+from utils.map_generator import generate_map as generate_map_file
 
 logger = get_logger("cogs.user_commands")
 
@@ -267,6 +268,9 @@ class UserCommandsCog(commands.Cog):
             map_file = TEMP_DIR / "carte_membres.html"
             with open(map_file, "w", encoding="utf-8") as f:
                 f.write(html_content)
+
+            # Publier sur GitHub Pages (si configure)
+            await generate_map_file(self.bot.db_pool)
 
             # Envoyer le lien ou le fichier selon la config
             if WEB_URL:
