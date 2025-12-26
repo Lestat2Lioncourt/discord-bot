@@ -20,7 +20,7 @@ logger = get_logger("utils.map_generator")
 # Chemins des fichiers
 MAP_TEMPLATE_PATH = DATA_DIR / "map_template.html"
 MAP_OUTPUT_PATH = TEMP_DIR / "carte_membres.html"
-GITHUB_PAGES_PATH = BASE_DIR / "docs" / "index.html"
+GITHUB_PAGES_PATH = BASE_DIR / "docs" / "carte.html"
 
 # Configuration GitHub Pages (activee par defaut si le dossier docs/ existe)
 GITHUB_PAGES_ENABLED = GITHUB_PAGES_PATH.parent.exists()
@@ -113,7 +113,7 @@ async def publish_to_github_pages(html_content: str, member_count: int):
 
         # Executer les commandes git
         subprocess.run(
-            ["git", "add", "docs/index.html"],
+            ["git", "add", "docs/carte.html"],
             cwd=BASE_DIR,
             capture_output=True,
             check=True
