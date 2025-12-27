@@ -608,7 +608,7 @@ class SagesCog(commands.Cog):
     @commands.command(name="audit-permissions", aliases=["audit-perms", "perms"])
     @sage_only()
     async def cmd_audit_permissions(self, ctx):
-        """Exporte les permissions par salon et par role."""
+        """Exporte les permissions par role (salons autorises/interdits)."""
         # Recuperer la guilde (ctx.guild peut etre None dans certains contextes)
         guild = ctx.guild
         if not guild and hasattr(ctx.channel, 'guild'):
@@ -623,85 +623,77 @@ class SagesCog(commands.Cog):
         if not guild:
             await ctx.send("Cette commande doit etre utilisee sur un serveur.")
             return
+
         await ctx.send("Generation de l'audit des permissions en cours...")
 
-        # Construire le rapport
-        lines = []
-        lines.append(f"# Audit des permissions - {guild.name}")
-        lines.append(f"# Genere le {discord.utils.utcnow().strftime('%Y-%m-%d %H:%M UTC')}")
-        lines.append(f"# Roles: {len(guild.roles)} | Salons: {len(guild.channels)}")
-        lines.append("")
+        # Recuperer les salons textuels et vocaux (pas les categories)
+        channels = [c for c in guild.channels if not isinstance(c, discord.CategoryChannel)]
+        channels.sort(key=lambda c: (c.category.position if c.category else -1, c.position))
 
-        # Trier les salons par categorie
-        categories = {}
-        no_category = []
+        # Roles a auditer (exclure @everyone et bots, du plus haut au plus bas)
+        roles_to_audit = [r for r in guild.roles if r.name != "@everyone" and not r.is_bot_managed()]
+        roles_to_audit.reverse()
 
-        for channel in guild.channels:
-            if isinstance(channel, discord.CategoryChannel):
+        # Construire le rapport par role
+        messages = []
+
+        for role in roles_to_audit:
+            allowed = []  # Salons autorises (lecture)
+            denied = []   # Salons explicitement interdits
+
+            for channel in channels:
+                overwrites = channel.overwrites_for(role)
+                prefix = "#" if isinstance(channel, discord.TextChannel) else "V:"
+
+                # Verifier si le role a acces en lecture
+                if overwrites.read_messages is True:
+                    allowed.append(f"{prefix}{channel.name}")
+                elif overwrites.read_messages is False:
+                    denied.append(f"{prefix}{channel.name}")
+                # Si None, herite des permissions par defaut (on ne l'affiche pas)
+
+            # Ne pas afficher les roles sans permissions specifiques
+            if not allowed and not denied:
                 continue
-            if channel.category:
-                if channel.category.name not in categories:
-                    categories[channel.category.name] = []
-                categories[channel.category.name].append(channel)
-            else:
-                no_category.append(channel)
 
-        # Fonction pour formater les permissions
-        def format_perms(channel, role):
-            overwrites = channel.overwrites_for(role)
-            perms = []
-            if overwrites.read_messages is True:
-                perms.append("R")
-            elif overwrites.read_messages is False:
-                perms.append("-R")
-            if overwrites.send_messages is True:
-                perms.append("W")
-            elif overwrites.send_messages is False:
-                perms.append("-W")
-            if overwrites.manage_channels is True:
-                perms.append("M")
-            if overwrites.manage_messages is True:
-                perms.append("Mod")
-            return " ".join(perms) if perms else "."
+            # Construire le message pour ce role
+            role_msg = f"**[ {role.name} ]**\n"
 
-        # Roles principaux a auditer (exclure @everyone et bots)
-        roles_to_audit = [r for r in guild.roles if r.name not in ["@everyone"] and not r.is_bot_managed()]
-        roles_to_audit.reverse()  # Du plus haut au plus bas
+            if allowed:
+                role_msg += "[+] " + ", ".join(allowed[:30])
+                if len(allowed) > 30:
+                    role_msg += f" (+{len(allowed) - 30})"
+                role_msg += "\n"
 
-        # Generer le rapport par categorie
-        for cat_name in sorted(categories.keys()):
-            lines.append(f"## {cat_name}")
-            for channel in sorted(categories[cat_name], key=lambda c: c.position):
-                channel_type = "T" if isinstance(channel, discord.TextChannel) else "V"
-                lines.append(f"  [{channel_type}] #{channel.name}")
-                for role in roles_to_audit[:10]:  # Top 10 roles
-                    perms = format_perms(channel, role)
-                    if perms != ".":
-                        lines.append(f"      {role.name}: {perms}")
-            lines.append("")
+            if denied:
+                role_msg += "[-] " + ", ".join(denied[:30])
+                if len(denied) > 30:
+                    role_msg += f" (+{len(denied) - 30})"
+                role_msg += "\n"
 
-        if no_category:
-            lines.append("## (Sans categorie)")
-            for channel in no_category:
-                channel_type = "T" if isinstance(channel, discord.TextChannel) else "V"
-                lines.append(f"  [{channel_type}] #{channel.name}")
+            messages.append(role_msg)
 
-        # Envoyer en DM (peut etre long)
-        report = "\n".join(lines)
-
+        # Envoyer en DM
         try:
-            # Si trop long, decouper
-            if len(report) > 1900:
-                chunks = [report[i:i+1900] for i in range(0, len(report), 1900)]
-                await ctx.author.send(f"**Audit des permissions de {guild.name}** ({len(chunks)} parties)")
-                for i, chunk in enumerate(chunks):
-                    await ctx.author.send(f"```\n{chunk}\n```")
-                await ctx.send(f"Audit envoye en DM ({len(chunks)} messages).")
-            else:
-                await ctx.author.send(f"**Audit des permissions de {guild.name}**\n```\n{report}\n```")
-                await ctx.send("Audit envoye en DM.")
+            header = f"**Audit des permissions - {guild.name}**\n"
+            header += f"{discord.utils.utcnow().strftime('%Y-%m-%d %H:%M UTC')}\n"
+            header += f"{len(roles_to_audit)} roles | {len(channels)} salons\n"
+            header += "[+] = acces autorise | [-] = acces interdit"
+            await ctx.author.send(header)
 
+            # Envoyer chaque role separement pour eviter la limite de 2000 caracteres
+            for msg in messages:
+                if len(msg) > 1900:
+                    # Decouper si trop long
+                    chunks = [msg[i:i+1900] for i in range(0, len(msg), 1900)]
+                    for chunk in chunks:
+                        await ctx.author.send(chunk)
+                else:
+                    await ctx.author.send(msg)
+
+            await ctx.send(f"Audit envoye en DM ({len(messages)} roles avec permissions specifiques).")
             logger.info(f"Audit permissions genere par {ctx.author.name}")
+
         except discord.Forbidden:
             await ctx.send("Impossible d'envoyer le rapport en DM. Verifie que tes DMs sont ouverts.")
 
