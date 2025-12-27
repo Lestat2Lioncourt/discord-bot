@@ -396,16 +396,17 @@ def geocode_cached(location: str) -> Optional[Location]:
 
 ## 9. Base de données
 
-### 🟡 Migrations automatiques
+### ✅ Migrations automatiques
 **Problème :** Migrations SQL manuelles
 
 **Solution :**
-- Lancer les migrations au boot du bot
-- Versionner les migrations
+- Table `schema_migrations` pour tracker les migrations appliquées
+- Exécution automatique au boot du bot
+- Seules les nouvelles migrations sont exécutées
 
-**Fichiers à modifier :**
-- [ ] `bot.py` - Appeler les migrations au démarrage
-- [ ] `scripts/run_migration.py` - Intégrer au boot
+**Fichiers créés/modifiés :**
+- [x] `utils/migrations.py` - Système de migrations avec tracking ✅
+- [x] `bot.py` - Appel `run_migrations()` au démarrage ✅
 
 ---
 

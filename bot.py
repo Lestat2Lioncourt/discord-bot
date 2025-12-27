@@ -16,6 +16,7 @@ from utils.logger import get_logger
 from utils.validators import validate_user_id, validate_username
 from utils.debug import debug_only, is_debug_mode
 from utils.i18n import t
+from utils.migrations import run_migrations
 from models.user_profile import UserProfile
 
 # ===============================================================================
@@ -325,6 +326,16 @@ if __name__ == "__main__":
             try:
                 await connect_to_db()
                 bot.db_pool = db_pool
+
+                # Executer les migrations automatiquement
+                try:
+                    executed, total = await run_migrations(db_pool)
+                    if executed > 0:
+                        logger.info(f"Migrations: {executed}/{total} appliquee(s)")
+                except Exception as e:
+                    logger.error(f"Erreur migrations: {e}")
+                    raise
+
                 await load_cogs()
                 if is_debug_mode():
                     logger.warning("=== MODE DEBUG ACTIVÉ ===")
