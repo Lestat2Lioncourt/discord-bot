@@ -11,6 +11,7 @@ dependencies = [
     "attrs==24.3.0",
     "cffi==1.17.1",
     "discord-py==2.4.0",
+    "fastapi==0.115.6",
     "frozenlist==1.5.0",
     "geopy==2.4.1",
     "idna==3.10",
@@ -21,6 +22,7 @@ dependencies = [
     "pydantic>=2.0.0",
     "pynacl==1.5.0",
     "python-dotenv==1.0.1",
+    "uvicorn==0.34.0",
     "yarl==1.18.3",
 ]
 
