@@ -630,9 +630,13 @@ class SagesCog(commands.Cog):
         channels = [c for c in guild.channels if not isinstance(c, discord.CategoryChannel)]
         channels.sort(key=lambda c: (c.category.position if c.category else -1, c.position))
 
-        # Roles a auditer (exclure @everyone et bots, du plus haut au plus bas)
-        roles_to_audit = [r for r in guild.roles if r.name != "@everyone" and not r.is_bot_managed()]
+        # Roles a auditer (exclure bots, du plus haut au plus bas, @everyone en dernier)
+        roles_to_audit = [r for r in guild.roles if not r.is_bot_managed() and r.name != "@everyone"]
         roles_to_audit.reverse()
+        # Ajouter @everyone a la fin
+        everyone_role = guild.default_role
+        if everyone_role:
+            roles_to_audit.append(everyone_role)
 
         # Construire le rapport par role
         messages = []
