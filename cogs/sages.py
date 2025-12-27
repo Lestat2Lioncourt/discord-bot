@@ -609,11 +609,20 @@ class SagesCog(commands.Cog):
     @sage_only()
     async def cmd_audit_permissions(self, ctx):
         """Exporte les permissions par salon et par role."""
-        if not ctx.guild:
+        # Recuperer la guilde (ctx.guild peut etre None dans certains contextes)
+        guild = ctx.guild
+        if not guild and hasattr(ctx.channel, 'guild'):
+            guild = ctx.channel.guild
+        if not guild:
+            # Chercher la guilde via le membre
+            for g in self.bot.guilds:
+                if g.get_member(ctx.author.id):
+                    guild = g
+                    break
+
+        if not guild:
             await ctx.send("Cette commande doit etre utilisee sur un serveur.")
             return
-
-        guild = ctx.guild
         await ctx.send("Generation de l'audit des permissions en cours...")
 
         # Construire le rapport
