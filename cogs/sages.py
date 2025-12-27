@@ -21,6 +21,7 @@ from utils.roles import is_sage, promote_to_membre, demote_to_newbie
 from utils.i18n import t
 from utils.map_generator import regenerate_map_if_needed
 from config import CHANNEL_GENERAL_ID, CHANNEL_SAGE_ID, DEBUG_MODE, DEBUG_USER
+from constants import Teams, ApprovalStatus
 
 logger = get_logger("cogs.sages")
 
@@ -92,6 +93,10 @@ class SagesCog(commands.Cog):
             await ctx.send(t("sages_cmd.pending_none", lang))
             return
 
+        # Recuperer tous les joueurs en une seule requete (evite N+1)
+        usernames = [m['username'] for m in pending[:25]]
+        players_by_member = await Player.get_by_members(self.bot.db_pool, usernames)
+
         embed = discord.Embed(
             title=t("sages_cmd.pending_title", lang),
             color=discord.Color.orange(),
@@ -102,8 +107,8 @@ class SagesCog(commands.Cog):
             username = member_data['username']
             discord_name = member_data.get('discord_name', username)
 
-            # Recuperer les joueurs
-            players = await Player.get_by_member(self.bot.db_pool, username)
+            # Utiliser le dictionnaire pre-charge
+            players = players_by_member.get(username, [])
             no_players = t("sages_cmd.pending_no_players", lang)
             players_str = ", ".join([p.player_name for p in players]) if players else no_players
 
@@ -177,7 +182,7 @@ class SagesCog(commands.Cog):
                 try:
                     await member.send(t("finish.approved", member_lang, sage_name=sage.display_name))
                 except discord.Forbidden:
-                    pass
+                    logger.debug(f"Impossible d'envoyer DM de validation a {username}")
 
                 # Regenerer la carte (le nouveau membre peut avoir une localisation)
                 await regenerate_map_if_needed(self.bot.db_pool)
@@ -190,8 +195,8 @@ class SagesCog(commands.Cog):
             logger.error(f"_do_validate erreur: {e}", exc_info=True)
             try:
                 await interaction.followup.send(f"Erreur: {e}", ephemeral=True)
-            except:
-                pass
+            except Exception as followup_error:
+                logger.debug(f"Impossible d'envoyer le message d'erreur: {followup_error}")
 
     async def _do_refuse(self, interaction: Interaction, member: discord.Member):
         """Refus depuis un bouton (interaction deja repondue)."""
@@ -218,7 +223,7 @@ class SagesCog(commands.Cog):
                 dm_msg += "\n\n" + t("finish.refused_contact", member_lang)
                 await member.send(dm_msg)
             except discord.Forbidden:
-                pass
+                logger.debug(f"Impossible d'envoyer DM de refus a {username}")
 
             logger.info(f"{username} refuse par {sage.name} (bouton)")
 
@@ -226,8 +231,8 @@ class SagesCog(commands.Cog):
             logger.error(f"_do_refuse erreur: {e}", exc_info=True)
             try:
                 await interaction.followup.send(f"Erreur: {e}", ephemeral=True)
-            except:
-                pass
+            except Exception as followup_error:
+                logger.debug(f"Impossible d'envoyer le message d'erreur: {followup_error}")
 
     async def _validate_member(self, ctx, member: discord.Member, sage_lang: str, sage: discord.Member = None):
         """Logique de validation d'un membre (commande uniquement)."""
@@ -537,9 +542,9 @@ class SagesCog(commands.Cog):
             team2 = [p.player_name for p in players if p.team_name == "This Is PSG 2"]
 
             if team1:
-                embed.add_field(name="This Is PSG", value=", ".join(team1), inline=True)
+                embed.add_field(name=Teams.TEAM1_NAME, value=", ".join(team1), inline=True)
             if team2:
-                embed.add_field(name="This Is PSG 2", value=", ".join(team2), inline=True)
+                embed.add_field(name=Teams.TEAM2_NAME, value=", ".join(team2), inline=True)
         else:
             embed.add_field(
                 name=t("sages_cmd.profil_admin_players", lang),
@@ -635,8 +640,8 @@ class ValidationView(View):
             logger.error(f"Erreur bouton Valider: {e}", exc_info=True)
             try:
                 await interaction.followup.send(f"Erreur: {e}", ephemeral=True)
-            except:
-                pass
+            except Exception as followup_error:
+                logger.debug(f"Impossible d'envoyer le message d'erreur: {followup_error}")
 
     @discord.ui.button(label="Refuser", style=ButtonStyle.danger, emoji="❌")
     async def refuse_btn(self, interaction: Interaction, button: Button):
@@ -676,8 +681,8 @@ class ValidationView(View):
             logger.error(f"Erreur bouton Refuser: {e}", exc_info=True)
             try:
                 await interaction.followup.send(f"Erreur: {e}", ephemeral=True)
-            except:
-                pass
+            except Exception as followup_error:
+                logger.debug(f"Impossible d'envoyer le message d'erreur: {followup_error}")
 
 
 async def notify_sages_new_registration(bot, member: discord.Member, profile, players: list):
@@ -693,12 +698,12 @@ async def notify_sages_new_registration(bot, member: discord.Member, profile, pl
 
     # Joueurs
     if players:
-        team1 = [p.player_name for p in players if p.team_name == "This Is PSG"]
-        team2 = [p.player_name for p in players if p.team_name == "This Is PSG 2"]
+        team1 = [p.player_name for p in players if p.team_name == Teams.TEAM1_NAME]
+        team2 = [p.player_name for p in players if p.team_name == Teams.TEAM2_NAME]
         if team1:
-            embed.add_field(name="This Is PSG", value=", ".join(team1), inline=True)
+            embed.add_field(name=Teams.TEAM1_NAME, value=", ".join(team1), inline=True)
         if team2:
-            embed.add_field(name="This Is PSG 2", value=", ".join(team2), inline=True)
+            embed.add_field(name=Teams.TEAM2_NAME, value=", ".join(team2), inline=True)
     else:
         embed.add_field(name="Joueurs", value="Aucun", inline=False)
 

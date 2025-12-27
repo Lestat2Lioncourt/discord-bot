@@ -33,9 +33,9 @@ for member_data in pending:
 - Ajouter méthode `Player.get_by_members(usernames: list)` avec IN clause
 
 **Fichiers à modifier :**
-- [ ] `models/player.py` - Ajouter `get_by_members()`
-- [ ] `cogs/sages.py:cmd_pending()` - Utiliser la nouvelle méthode
-- [ ] `cogs/registration.py:finish_registration()` - Optimiser
+- [x] `models/player.py` - Ajouter `get_by_members()` ✅
+- [x] `cogs/sages.py:cmd_pending()` - Utiliser la nouvelle méthode ✅
+- [ ] `cogs/registration.py:finish_registration()` - Optimiser (pas de N+1 ici)
 
 ---
 
@@ -128,8 +128,9 @@ except Exception as e:
 ```
 
 **Fichiers à modifier :**
-- [ ] `cogs/registration.py` lignes 627, 640, 703, 716
-- [ ] Audit complet des try/except dans tous les fichiers
+- [x] `cogs/registration.py` - 6 blocs corrigés ✅
+- [x] `cogs/sages.py` - 6 blocs corrigés ✅
+- [x] `bot.py` - 1 bloc corrigé ✅
 
 ---
 
@@ -164,10 +165,10 @@ class Timeouts:
 ```
 
 **Fichiers à créer/modifier :**
-- [ ] `constants.py` - Nouveau fichier
-- [ ] `cogs/registration.py` - Remplacer les strings
-- [ ] `cogs/sages.py` - Remplacer les strings
-- [ ] `models/user_profile.py` - Remplacer les strings
+- [x] `constants.py` - Nouveau fichier créé ✅
+- [x] `cogs/registration.py` - Timeouts et Teams intégrés ✅
+- [x] `cogs/sages.py` - Teams intégrés ✅
+- [ ] `models/user_profile.py` - À faire (Phase 2)
 
 ---
 
@@ -446,5 +447,5 @@ async with pool.acquire() as conn:
 | Date | Modification | Auteur |
 |------|--------------|--------|
 | 27/12/2024 | Création du document | Claude |
-| | | |
+| 27/12/2024 | Phase 1 terminée : logging, N+1, constants.py | Claude |
 

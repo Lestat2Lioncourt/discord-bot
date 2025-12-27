@@ -26,6 +26,7 @@ from utils.i18n import t, Translator
 from cogs.sages import notify_sages_new_registration, notify_sages_returning_member
 from utils.map_generator import regenerate_map_if_needed
 from config import CHARTE_FILES, DATA_DIR, CHANNEL_ACCUEIL_ID
+from constants import Teams, Timeouts, ApprovalStatus
 
 logger = get_logger("cogs.registration")
 
@@ -75,7 +76,7 @@ class RegistrationCog(commands.Cog):
             )
 
             try:
-                await asyncio.wait_for(view.wait(), timeout=300)
+                await asyncio.wait_for(view.wait(), timeout=Timeouts.LANGUAGE_SELECT)
             except asyncio.TimeoutError:
                 await dm_channel.send("Temps ecoule / Time expired.")
                 self.active_registrations.pop(member.name, None)
@@ -127,7 +128,7 @@ class RegistrationCog(commands.Cog):
         await dm_channel.send("", view=view)
 
         try:
-            await asyncio.wait_for(view.wait(), timeout=600)  # 10 minutes pour lire
+            await asyncio.wait_for(view.wait(), timeout=Timeouts.CHARTE_READ)
         except asyncio.TimeoutError:
             await dm_channel.send(t("charte.timeout", lang))
             self.active_registrations.pop(username, None)
@@ -173,12 +174,12 @@ class RegistrationCog(commands.Cog):
                 msg = "**Some information is already registered:**\n"
 
             if existing_players:
-                team1 = [p.player_name for p in existing_players if p.team_name == "This Is PSG"]
-                team2 = [p.player_name for p in existing_players if p.team_name == "This Is PSG 2"]
+                team1 = [p.player_name for p in existing_players if p.team_name == Teams.TEAM1_NAME]
+                team2 = [p.player_name for p in existing_players if p.team_name == Teams.TEAM2_NAME]
                 if team1:
-                    msg += f"• This Is PSG : {', '.join(team1)}\n"
+                    msg += f"• {Teams.TEAM1_NAME} : {', '.join(team1)}\n"
                 if team2:
-                    msg += f"• This Is PSG 2 : {', '.join(team2)}\n"
+                    msg += f"• {Teams.TEAM2_NAME} : {', '.join(team2)}\n"
 
             if profile.localisation:
                 coords = ""
@@ -194,7 +195,7 @@ class RegistrationCog(commands.Cog):
             await dm_channel.send(t("profile.choose_option", lang), view=view)
 
             try:
-                await asyncio.wait_for(view.wait(), timeout=300)
+                await asyncio.wait_for(view.wait(), timeout=Timeouts.KEEP_OR_RESET)
             except asyncio.TimeoutError:
                 await dm_channel.send(t("profile.players_kept", lang))
                 view.keep = True
@@ -217,10 +218,10 @@ class RegistrationCog(commands.Cog):
         await asyncio.sleep(0.5)
 
         # Team 1
-        await self.ask_players_for_team(member, dm_channel, 1, "This Is PSG", lang, is_main_team=True)
+        await self.ask_players_for_team(member, dm_channel, Teams.TEAM1_ID, Teams.TEAM1_NAME, lang, is_main_team=True)
 
         # Team 2
-        await self.ask_players_for_team(member, dm_channel, 2, "This Is PSG 2", lang, is_main_team=False)
+        await self.ask_players_for_team(member, dm_channel, Teams.TEAM2_ID, Teams.TEAM2_NAME, lang, is_main_team=False)
 
         # 4.2 Localisation
         await asyncio.sleep(0.5)
@@ -240,7 +241,7 @@ class RegistrationCog(commands.Cog):
             return m.author == member and isinstance(m.channel, discord.DMChannel)
 
         try:
-            msg = await self.bot.wait_for("message", check=check, timeout=120)
+            msg = await self.bot.wait_for("message", check=check, timeout=Timeouts.PLAYER_INPUT)
             content = msg.content.strip()
 
             # Si "." ou vide, passer cette equipe
@@ -305,7 +306,7 @@ class RegistrationCog(commands.Cog):
             return m.author == member and isinstance(m.channel, discord.DMChannel)
 
         try:
-            msg = await self.bot.wait_for("message", check=check, timeout=120)
+            msg = await self.bot.wait_for("message", check=check, timeout=Timeouts.PLAYER_INPUT)
             location = msg.content.strip()
 
             if location and location != ".":
@@ -334,7 +335,7 @@ class RegistrationCog(commands.Cog):
 
         try:
             geolocator = Nominatim(user_agent="discord-bot-this-is-psg")
-            loc = geolocator.geocode(location, timeout=10)
+            loc = geolocator.geocode(location, timeout=Timeouts.GEOCODING)
 
             if loc:
                 async with self.bot.db_pool.acquire() as conn:
@@ -442,16 +443,16 @@ class RegistrationCog(commands.Cog):
         )
 
         if players:
-            team1_players = [p for p in players if p.team_name == "This Is PSG"]
-            team2_players = [p for p in players if p.team_name == "This Is PSG 2"]
+            team1_players = [p for p in players if p.team_name == Teams.TEAM1_NAME]
+            team2_players = [p for p in players if p.team_name == Teams.TEAM2_NAME]
 
             if team1_players:
                 names = ", ".join([p.player_name for p in team1_players])
-                embed.add_field(name="This Is PSG", value=names, inline=False)
+                embed.add_field(name=Teams.TEAM1_NAME, value=names, inline=False)
 
             if team2_players:
                 names = ", ".join([p.player_name for p in team2_players])
-                embed.add_field(name="This Is PSG 2", value=names, inline=False)
+                embed.add_field(name=Teams.TEAM2_NAME, value=names, inline=False)
         else:
             embed.add_field(name=t("profil_cmd.players", lang), value=t("profil_cmd.no_players", lang), inline=False)
 
@@ -479,14 +480,14 @@ class RegistrationCog(commands.Cog):
         players = await Player.get_by_member(self.bot.db_pool, username)
 
         if players:
-            team1 = [p.player_name for p in players if p.team_name == "This Is PSG"]
-            team2 = [p.player_name for p in players if p.team_name == "This Is PSG 2"]
+            team1 = [p.player_name for p in players if p.team_name == Teams.TEAM1_NAME]
+            team2 = [p.player_name for p in players if p.team_name == Teams.TEAM2_NAME]
 
             msg = t("profile.existing_players", lang) + "\n"
             if team1:
-                msg += f"This Is PSG : {', '.join(team1)}\n"
+                msg += f"{Teams.TEAM1_NAME} : {', '.join(team1)}\n"
             if team2:
-                msg += f"This Is PSG 2 : {', '.join(team2)}\n"
+                msg += f"{Teams.TEAM2_NAME} : {', '.join(team2)}\n"
             await ctx.send(msg)
         else:
             await ctx.send(t("commands.no_players", lang))
@@ -509,10 +510,10 @@ class RegistrationCog(commands.Cog):
         await asyncio.sleep(0.5)
 
         # Team 1
-        await self.ask_players_for_team(member, dm_channel, 1, "This Is PSG", lang, is_main_team=True)
+        await self.ask_players_for_team(member, dm_channel, Teams.TEAM1_ID, Teams.TEAM1_NAME, lang, is_main_team=True)
 
         # Team 2
-        await self.ask_players_for_team(member, dm_channel, 2, "This Is PSG 2", lang, is_main_team=False)
+        await self.ask_players_for_team(member, dm_channel, Teams.TEAM2_ID, Teams.TEAM2_NAME, lang, is_main_team=False)
 
         # Resume
         players = await Player.get_by_member(self.bot.db_pool, username)
@@ -557,7 +558,7 @@ class RegistrationCog(commands.Cog):
 
         try:
             geolocator = Nominatim(user_agent="discord-bot-this-is-psg")
-            loc = geolocator.geocode(location, timeout=10)
+            loc = geolocator.geocode(location, timeout=Timeouts.GEOCODING)
 
             if loc:
                 async with self.bot.db_pool.acquire() as conn:
@@ -588,7 +589,7 @@ class RegistrationCog(commands.Cog):
         msg = await ctx.send("**Choisis ta langue / Select your language**", view=view)
 
         try:
-            await asyncio.wait_for(view.wait(), timeout=60)
+            await asyncio.wait_for(view.wait(), timeout=Timeouts.LANGUAGE_CHANGE)
         except asyncio.TimeoutError:
             await msg.edit(content="Temps ecoule / Time expired.", view=None)
             return
@@ -612,7 +613,7 @@ class LanguageSelectView(View):
     """Vue pour choisir la langue."""
 
     def __init__(self, member: discord.Member):
-        super().__init__(timeout=300)
+        super().__init__(timeout=Timeouts.LANGUAGE_SELECT)
         self.member = member
         self.language = None
 
@@ -624,8 +625,8 @@ class LanguageSelectView(View):
         self.language = "FR"
         try:
             await interaction.message.edit(content="🇫🇷 Francais selectionne", view=None)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Impossible de modifier le message de selection de langue: {e}")
         self.stop()
 
     @discord.ui.button(label="🇬🇧", style=ButtonStyle.primary)
@@ -636,8 +637,8 @@ class LanguageSelectView(View):
         self.language = "EN"
         try:
             await interaction.message.edit(content="🇬🇧 English selected", view=None)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Impossible de modifier le message de selection de langue: {e}")
         self.stop()
 
 
@@ -645,7 +646,7 @@ class CharteAcceptView(View):
     """Vue pour accepter/refuser la charte."""
 
     def __init__(self, member: discord.Member, lang: str = "fr"):
-        super().__init__(timeout=600)
+        super().__init__(timeout=Timeouts.CHARTE_READ)
         self.member = member
         self.lang = lang
         self.accepted = False
@@ -662,8 +663,8 @@ class CharteAcceptView(View):
         self.accepted = True
         try:
             await interaction.message.edit(content="✅", view=None)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Impossible de modifier le message d'acceptation de charte: {e}")
         self.stop()
 
     @discord.ui.button(label="Je refuse", style=ButtonStyle.red, custom_id="refuse")
@@ -674,8 +675,8 @@ class CharteAcceptView(View):
         self.accepted = False
         try:
             await interaction.message.edit(content="❌", view=None)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Impossible de modifier le message de refus de charte: {e}")
         self.stop()
 
 
@@ -683,7 +684,7 @@ class KeepOrResetView(View):
     """Vue pour choisir de conserver ou effacer les joueurs existants."""
 
     def __init__(self, member: discord.Member, lang: str = "fr"):
-        super().__init__(timeout=300)
+        super().__init__(timeout=Timeouts.KEEP_OR_RESET)
         self.member = member
         self.lang = lang
         self.keep = None
@@ -699,8 +700,8 @@ class KeepOrResetView(View):
         self.keep = True
         try:
             await interaction.message.edit(content=t("profile.players_kept", self.lang), view=None)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Impossible de modifier le message de conservation des joueurs: {e}")
         self.stop()
 
     @discord.ui.button(label="Tout effacer", style=ButtonStyle.red, custom_id="reset")
@@ -711,8 +712,8 @@ class KeepOrResetView(View):
         self.keep = False
         try:
             await interaction.message.edit(content=t("profile.players_deleted", self.lang), view=None)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Impossible de modifier le message de suppression des joueurs: {e}")
         self.stop()
 
 

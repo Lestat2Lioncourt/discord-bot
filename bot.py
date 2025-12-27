@@ -134,8 +134,8 @@ async def custom_help(ctx, command_name: str = None):
         async with bot.db_pool.acquire() as conn:
             profile = await UserProfile.get_or_create_user(ctx.author.name, conn, ctx.author)
             lang = profile.language or "FR"
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"Impossible de recuperer la langue pour {ctx.author.name}, utilisation FR par defaut: {e}")
 
     # Details de toutes les commandes (FR/EN)
     commands_details = {

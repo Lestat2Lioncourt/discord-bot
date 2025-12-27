@@ -67,6 +67,43 @@ class Player:
             ) for row in rows]
 
     @classmethod
+    async def get_by_members(cls, db_pool, usernames: List[str]) -> dict:
+        """Récupère tous les joueurs pour plusieurs membres en une seule requête.
+
+        Args:
+            db_pool: Pool de connexion à la base de données
+            usernames: Liste des noms d'utilisateurs
+
+        Returns:
+            Dictionnaire {username: [Player, ...]}
+        """
+        if not usernames:
+            return {}
+
+        query = """
+        SELECT p.id, p.member_username, p.team_id, t.name as team_name,
+               p.player_name, p.created_at
+        FROM players p
+        LEFT JOIN teams t ON p.team_id = t.id
+        WHERE p.member_username = ANY($1)
+        ORDER BY p.member_username, t.name, p.player_name
+        """
+        result = {username: [] for username in usernames}
+        async with db_pool.acquire() as conn:
+            rows = await conn.fetch(query, usernames)
+            for row in rows:
+                player = cls(
+                    id=row['id'],
+                    member_username=row['member_username'],
+                    team_id=row['team_id'],
+                    team_name=row['team_name'],
+                    player_name=row['player_name'],
+                    created_at=row['created_at']
+                )
+                result[row['member_username']].append(player)
+        return result
+
+    @classmethod
     async def get_by_team(cls, db_pool, team_id: int) -> List['Player']:
         """Récupère tous les joueurs d'une team."""
         query = """
