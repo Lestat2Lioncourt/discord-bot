@@ -91,18 +91,18 @@
     "players": "Players",
     "no_players": "No players registered",
     "location": "Location",
-    "footer": "Use !joueur, !localisation to edit"
+    "footer": "Use !player / !joueur, !location / !localisation to edit"
   },
 
   "help_cmd": {
     "title": "📚 Available Commands",
     "subtitle": "Use `!help <command>` for more details.",
     "general": "🌐 General",
-    "general_list": "`!help` - Show this help\n`!langue` - Change your language (FR/EN)",
+    "general_list": "`!help` - Show this help\n`!language / !langue` - Change your language (FR/EN)",
     "profile": "👤 Registration & Profile",
-    "profile_list": "`!inscription` - Start registration\n`!profil` - Show your profile\n`!joueur` - Manage your players\n`!localisation` - Set your location\n`!users` - List members\n`!carte` - Interactive members map",
+    "profile_list": "`!inscription` - Start registration\n`!profil` - Show your profile\n`!player / !joueur` - Manage your players\n`!location / !localisation` - Set your location\n`!users / !membres` - List members\n`!map / !carte` - Interactive members map",
     "sages": "⚖️ Sages (moderators)",
-    "sages_list": "`!pending` - Pending registrations\n`!valider @user` - Approve a member\n`!refuser @user` - Reject a member\n`!profil-admin @user` - Full profile",
+    "sages_list": "`!pending / !attente` - Pending registrations\n`!approve / !valider` - Approve a member\n`!refuse / !refuser` - Reject a member\n`!profil-admin @user` - Full profile",
     "footer": "This Is PSG - Tennis Clash Team",
     "cmd_title": "📖 Command `!{cmd}`",
     "description": "Description",

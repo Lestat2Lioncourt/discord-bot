@@ -1,7 +1,5 @@
 import discord
 from discord.ext import commands
-from discord import ButtonStyle, Interaction
-from discord.ui import Button, View
 from utils.image_processing import process_image
 from utils.logger import get_logger
 from utils.database import Database
@@ -18,9 +16,6 @@ logger = get_logger("cogs.user_commands")
 
 # Chemin du template de carte
 MAP_TEMPLATE_PATH = DATA_DIR / "map_template.html"
-
-USERS_PER_PAGE = 20
-
 
 class UserCommandsCog(commands.Cog):
     """Commandes accessibles à tous les utilisateurs."""
@@ -67,7 +62,7 @@ class UserCommandsCog(commands.Cog):
 
     @commands.command(name="users", aliases=["utilisateurs", "membres"])
     async def list_users(self, ctx):
-        """Affiche la liste des utilisateurs enregistrés avec pagination."""
+        """Affiche la liste des utilisateurs enregistrés."""
         async with self.bot.db_pool.acquire() as connection:
             users = await connection.fetch("""
                 SELECT last_connection, username, discord_name, approval_status
@@ -84,34 +79,14 @@ class UserCommandsCog(commands.Cog):
             await ctx.send(embed=embed)
             return
 
-        # Convertir en liste de dicts
-        users_list = [dict(u) for u in users]
-        total = len(users_list)
-        total_pages = (total + USERS_PER_PAGE - 1) // USERS_PER_PAGE
-
-        # Créer l'embed pour la première page
-        embed = self._create_users_embed(users_list, 0, total, total_pages)
-
-        if total_pages <= 1:
-            await ctx.send(embed=embed)
-        else:
-            view = UsersPaginationView(users_list, total, total_pages, ctx.author)
-            view.message = await ctx.send(embed=embed, view=view)
-
-    def _create_users_embed(self, users: list, page: int, total: int, total_pages: int) -> discord.Embed:
-        """Crée l'embed pour une page de la liste des utilisateurs."""
-        start = page * USERS_PER_PAGE
-        end = min(start + USERS_PER_PAGE, total)
-        page_users = users[start:end]
-
         # Indicateurs de statut
         status_icons = {"approved": "✓", "pending": "⏳", "refused": "✗"}
 
-        # Calculer la largeur max des noms pour cette page
-        max_name_len = max(len(u['discord_name'] or u['username']) for u in page_users)
+        # Calculer la largeur max des noms
+        max_name_len = max(len(u['discord_name'] or u['username']) for u in users)
 
         user_list = "```"
-        for user in page_users:
+        for user in users:
             last_conn = user['last_connection']
             if last_conn:
                 date_str = last_conn.strftime('%Y-%m-%d %H:%M')
@@ -122,13 +97,37 @@ class UserCommandsCog(commands.Cog):
             user_list += f"{date_str} {display:<{max_name_len}} {status}\n"
         user_list += "```"
 
-        embed = discord.Embed(
-            title=f"📜 Membres ({total})",
-            description=user_list,
-            color=discord.Color.blue()
-        )
-        embed.set_footer(text=f"Page {page + 1}/{total_pages}")
-        return embed
+        # Si le message dépasse 4000 caractères, on envoie en plusieurs messages
+        if len(user_list) > 4000:
+            # Découper en morceaux
+            chunks = []
+            current = "```"
+            for user in users:
+                last_conn = user['last_connection']
+                date_str = last_conn.strftime('%Y-%m-%d %H:%M') if last_conn else "----/--/-- --:--"
+                display = user['discord_name'] or user['username']
+                status = status_icons.get(user['approval_status'], "?")
+                line = f"{date_str} {display:<{max_name_len}} {status}\n"
+
+                if len(current) + len(line) + 3 > 4000:  # +3 pour ```
+                    current += "```"
+                    chunks.append(current)
+                    current = "```" + line
+                else:
+                    current += line
+            current += "```"
+            chunks.append(current)
+
+            await ctx.send(f"📜 **Membres ({len(users)})**")
+            for chunk in chunks:
+                await ctx.send(chunk)
+        else:
+            embed = discord.Embed(
+                title=f"📜 Membres ({len(users)})",
+                description=user_list,
+                color=discord.Color.blue()
+            )
+            await ctx.send(embed=embed)
 
     @commands.command(name="db_status")
     async def db_status(self, ctx):
@@ -302,85 +301,6 @@ class UserCommandsCog(commands.Cog):
         except Exception as e:
             logger.error(f"Erreur generation carte: {e}")
             await ctx.send("Erreur lors de la generation de la carte.")
-
-
-class UsersPaginationView(View):
-    """Vue pour la pagination de la liste des utilisateurs."""
-
-    def __init__(self, users: list, total: int, total_pages: int, author):
-        super().__init__(timeout=120)
-        self.users = users
-        self.total = total
-        self.total_pages = total_pages
-        self.author = author
-        self.current_page = 0
-        self.message = None
-        self._update_buttons()
-
-    def _update_buttons(self):
-        """Met à jour l'état des boutons selon la page actuelle."""
-        self.prev_btn.disabled = self.current_page == 0
-        self.next_btn.disabled = self.current_page >= self.total_pages - 1
-
-    def _create_embed(self) -> discord.Embed:
-        """Crée l'embed pour la page actuelle."""
-        start = self.current_page * USERS_PER_PAGE
-        end = min(start + USERS_PER_PAGE, self.total)
-        page_users = self.users[start:end]
-
-        # Indicateurs de statut
-        status_icons = {"approved": "✓", "pending": "⏳", "refused": "✗"}
-
-        # Calculer la largeur max des noms pour cette page
-        max_name_len = max(len(u['discord_name'] or u['username']) for u in page_users)
-
-        user_list = "```"
-        for user in page_users:
-            last_conn = user['last_connection']
-            if last_conn:
-                date_str = last_conn.strftime('%Y-%m-%d %H:%M')
-            else:
-                date_str = "----/--/-- --:--"
-            display = user['discord_name'] or user['username']
-            status = status_icons.get(user['approval_status'], "?")
-            user_list += f"{date_str} {display:<{max_name_len}} {status}\n"
-        user_list += "```"
-
-        embed = discord.Embed(
-            title=f"📜 Membres ({self.total})",
-            description=user_list,
-            color=discord.Color.blue()
-        )
-        embed.set_footer(text=f"Page {self.current_page + 1}/{self.total_pages}")
-        return embed
-
-    @discord.ui.button(label="◀ Précédent", style=ButtonStyle.secondary, custom_id="prev")
-    async def prev_btn(self, interaction: Interaction, button: Button):
-        if interaction.user != self.author:
-            await interaction.response.defer()
-            return
-        self.current_page = max(0, self.current_page - 1)
-        self._update_buttons()
-        await interaction.response.edit_message(embed=self._create_embed(), view=self)
-
-    @discord.ui.button(label="Suivant ▶", style=ButtonStyle.primary, custom_id="next")
-    async def next_btn(self, interaction: Interaction, button: Button):
-        if interaction.user != self.author:
-            await interaction.response.defer()
-            return
-        self.current_page = min(self.total_pages - 1, self.current_page + 1)
-        self._update_buttons()
-        await interaction.response.edit_message(embed=self._create_embed(), view=self)
-
-    async def on_timeout(self):
-        """Désactive les boutons après timeout."""
-        if self.message:
-            try:
-                self.prev_btn.disabled = True
-                self.next_btn.disabled = True
-                await self.message.edit(view=self)
-            except Exception:
-                pass
 
 
 async def setup(bot):

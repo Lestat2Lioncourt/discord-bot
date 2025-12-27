@@ -91,18 +91,18 @@
     "players": "Joueurs",
     "no_players": "Aucun joueur enregistre",
     "location": "Localisation",
-    "footer": "Utilise !joueur, !localisation pour modifier"
+    "footer": "Utilise !joueur / !player, !localisation / !location pour modifier"
   },
 
   "help_cmd": {
     "title": "📚 Commandes disponibles",
     "subtitle": "Utilise `!help <commande>` pour plus de details.",
     "general": "🌐 General",
-    "general_list": "`!help` - Affiche cette aide\n`!langue` - Change ta langue (FR/EN)",
+    "general_list": "`!help` - Affiche cette aide\n`!langue / !language` - Change ta langue (FR/EN)",
     "profile": "👤 Inscription & Profil",
-    "profile_list": "`!inscription` - Demarre l'inscription\n`!profil` - Affiche ton profil\n`!joueur` - Gere tes joueurs\n`!localisation` - Definit ta position\n`!users` - Liste des membres\n`!carte` - Carte interactive des membres",
+    "profile_list": "`!inscription` - Demarre l'inscription\n`!profil` - Affiche ton profil\n`!joueur / !player` - Gere tes joueurs\n`!localisation / !location` - Definit ta position\n`!users / !membres` - Liste des membres\n`!carte / !map` - Carte interactive des membres",
     "sages": "⚖️ Sages (moderateurs)",
-    "sages_list": "`!pending` - Inscriptions en attente\n`!valider @user` - Valide un membre\n`!refuser @user` - Refuse un membre\n`!profil-admin @user` - Profil complet",
+    "sages_list": "`!pending / !attente` - Inscriptions en attente\n`!valider / !approve` - Valide un membre\n`!refuser / !refuse` - Refuse un membre\n`!profil-admin @user` - Profil complet",
     "footer": "This Is PSG - Tennis Clash Team",
     "cmd_title": "📖 Commande `!{cmd}`",
     "description": "Description",
