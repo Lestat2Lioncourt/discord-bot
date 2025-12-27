@@ -616,7 +616,7 @@ class LanguageSelectView(View):
         self.member = member
         self.language = None
 
-    @discord.ui.button(label="Francais", style=ButtonStyle.primary, emoji="🇫🇷")
+    @discord.ui.button(label="🇫🇷", style=ButtonStyle.primary)
     async def french(self, interaction: Interaction, button: Button):
         await interaction.response.defer()
         if interaction.user != self.member:
@@ -628,7 +628,7 @@ class LanguageSelectView(View):
             pass
         self.stop()
 
-    @discord.ui.button(label="English", style=ButtonStyle.primary, emoji="🇬🇧")
+    @discord.ui.button(label="🇬🇧", style=ButtonStyle.primary)
     async def english(self, interaction: Interaction, button: Button):
         await interaction.response.defer()
         if interaction.user != self.member:
