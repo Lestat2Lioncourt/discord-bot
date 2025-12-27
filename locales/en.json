@@ -36,16 +36,16 @@
 
   "players": {
     "title": "**4.1 Your in-game players**",
-    "intro": "Enter your player names **as they appear in Tennis Clash**.\nYou can have multiple players in each team.\nType `.` to skip to the next team.",
-    "team_main": "▶️ **{team_name}** (main team):",
-    "team_other": "▶️ **{team_name}**:",
-    "name_too_short": "Name too short, try again:",
-    "name_too_long": "Name too long, try again:",
-    "player_added": "Player **{player_name}** added! (`.` to finish, or another name):",
-    "player_exists": "Player **{player_name}** already exists in this team. Another name or `.`:",
-    "error": "Error adding player. Try again:",
+    "intro": "Enter your player names **as they appear in Tennis Clash**.",
+    "team_main": "▶️ **{team_name}** (main team):\nEnter name(s) separated by commas, or `.` if none:",
+    "team_other": "▶️ **{team_name}**:\nEnter name(s) separated by commas, or `.` if none:",
+    "skipped": "No player for {team_name}.",
+    "name_too_short_skip": "Name too short, skipped: {player_name}",
+    "name_too_long_skip": "Name too long, skipped: {player_name}",
+    "player_exists": "Player **{player_name}** already exists.",
+    "error": "Error adding player.",
     "timeout": "Time expired, moving on...",
-    "count": "✓ {count} player(s) in {team_name}"
+    "count": "✓ {count} player(s) added to {team_name}"
   },
 
   "location": {

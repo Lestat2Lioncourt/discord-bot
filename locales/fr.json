@@ -36,16 +36,16 @@
 
   "players": {
     "title": "**4.1 Tes joueurs dans le jeu**",
-    "intro": "Saisis les noms de tes joueurs **tels qu'ils apparaissent dans Tennis Clash**.\nTu peux avoir plusieurs joueurs dans chaque equipe.\nTape `.` pour passer a l'equipe suivante.",
-    "team_main": "▶️ **{team_name}** (equipe principale) :",
-    "team_other": "▶️ **{team_name}** :",
-    "name_too_short": "Nom trop court, reessaie :",
-    "name_too_long": "Nom trop long, reessaie :",
-    "player_added": "Joueur **{player_name}** ajoute ! (`.` pour terminer, ou autre nom) :",
-    "player_exists": "Le joueur **{player_name}** existe deja dans cette equipe. Autre nom ou `.` :",
-    "error": "Erreur lors de l'ajout. Reessaie :",
+    "intro": "Saisis les noms de tes joueurs **tels qu'ils apparaissent dans Tennis Clash**.",
+    "team_main": "▶️ **{team_name}** (equipe principale) :\nEntre le(s) nom(s) separes par des virgules, ou `.` si aucun :",
+    "team_other": "▶️ **{team_name}** :\nEntre le(s) nom(s) separes par des virgules, ou `.` si aucun :",
+    "skipped": "Aucun joueur pour {team_name}.",
+    "name_too_short_skip": "Nom trop court ignore : {player_name}",
+    "name_too_long_skip": "Nom trop long ignore : {player_name}",
+    "player_exists": "Le joueur **{player_name}** existe deja.",
+    "error": "Erreur lors de l'ajout.",
     "timeout": "Temps ecoule, on continue...",
-    "count": "✓ {count} joueur(s) dans {team_name}"
+    "count": "✓ {count} joueur(s) ajoute(s) dans {team_name}"
   },
 
   "location": {

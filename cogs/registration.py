@@ -228,7 +228,7 @@ class RegistrationCog(commands.Cog):
 
     async def ask_players_for_team(self, member: discord.Member, dm_channel: discord.DMChannel,
                                     team_id: int, team_name: str, lang: str, is_main_team: bool = True):
-        """Demande les joueurs pour une equipe."""
+        """Demande les joueurs pour une equipe (tous en une fois, separes par des virgules)."""
         username = member.name
 
         if is_main_team:
@@ -236,29 +236,33 @@ class RegistrationCog(commands.Cog):
         else:
             await dm_channel.send(t("players.team_other", lang, team_name=team_name))
 
-        players_added = []
-        while True:
-            def check(m):
-                return m.author == member and isinstance(m.channel, discord.DMChannel)
+        def check(m):
+            return m.author == member and isinstance(m.channel, discord.DMChannel)
 
-            try:
-                msg = await self.bot.wait_for("message", check=check, timeout=120)
-                player_name = msg.content.strip()
+        try:
+            msg = await self.bot.wait_for("message", check=check, timeout=120)
+            content = msg.content.strip()
 
-                if player_name == "." or player_name.lower() == "stop" or not player_name:
-                    break
+            # Si "." ou vide, passer cette equipe
+            if content == "." or not content:
+                await dm_channel.send(t("players.skipped", lang, team_name=team_name))
+                return
 
+            # Parser les noms separes par des virgules
+            player_names = [name.strip() for name in content.split(",") if name.strip()]
+
+            players_added = []
+            for player_name in player_names:
                 if len(player_name) < 2:
-                    await dm_channel.send(t("players.name_too_short", lang))
+                    await dm_channel.send(t("players.name_too_short_skip", lang, player_name=player_name))
                     continue
                 if len(player_name) > 50:
-                    await dm_channel.send(t("players.name_too_long", lang))
+                    await dm_channel.send(t("players.name_too_long_skip", lang, player_name=player_name))
                     continue
 
                 try:
                     await Player.create(self.bot.db_pool, username, player_name, team_id)
                     players_added.append(player_name)
-                    await dm_channel.send(t("players.player_added", lang, player_name=player_name))
                 except Exception as e:
                     error_msg = str(e)
                     if "unique_player_per_team" in error_msg or "duplicate key" in error_msg.lower():
@@ -267,12 +271,11 @@ class RegistrationCog(commands.Cog):
                         logger.error(f"Erreur creation joueur: {e}")
                         await dm_channel.send(t("players.error", lang))
 
-            except asyncio.TimeoutError:
-                await dm_channel.send(t("players.timeout", lang))
-                break
+            if players_added:
+                await dm_channel.send(t("players.count", lang, count=len(players_added), team_name=team_name))
 
-        if players_added:
-            await dm_channel.send(t("players.count", lang, count=len(players_added), team_name=team_name))
+        except asyncio.TimeoutError:
+            await dm_channel.send(t("players.timeout", lang))
 
     async def ask_location(self, member: discord.Member, dm_channel: discord.DMChannel, lang: str):
         """Demande la localisation (optionnel)."""
