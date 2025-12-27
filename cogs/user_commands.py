@@ -214,18 +214,7 @@ class UserCommandsCog(commands.Cog):
     async def show_map(self, ctx):
         """Affiche le lien vers la carte interactive des membres."""
         if WEB_URL:
-            embed = discord.Embed(
-                title="🗺️ Carte des membres",
-                description="Carte interactive des membres de la team",
-                url=WEB_URL,
-                color=discord.Color.blue()
-            )
-            embed.add_field(
-                name="Ouvrir la carte",
-                value=f"[Cliquez ici pour voir la carte interactive]({WEB_URL})",
-                inline=False
-            )
-            await ctx.send(embed=embed)
+            await ctx.send(f"🗺️ **Carte des membres** : {WEB_URL}")
         else:
             await ctx.send("La carte n'est pas configuree. Contactez un administrateur.")
 
@@ -233,18 +222,7 @@ class UserCommandsCog(commands.Cog):
     async def show_site(self, ctx):
         """Affiche le lien vers le site de la team."""
         if SITE_URL:
-            embed = discord.Embed(
-                title="🌐 Site This Is PSG",
-                description="Page officielle de la team",
-                url=SITE_URL,
-                color=discord.Color.blue()
-            )
-            embed.add_field(
-                name="Ouvrir le site",
-                value=f"[Cliquez ici pour acceder au site]({SITE_URL})",
-                inline=False
-            )
-            await ctx.send(embed=embed)
+            await ctx.send(f"🌐 **Site This Is PSG** : {SITE_URL}")
         else:
             await ctx.send("Le site n'est pas configure. Contactez un administrateur.")
 
