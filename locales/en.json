@@ -74,7 +74,8 @@
 
   "errors": {
     "dm_failed": "I cannot send you a private message. Check your settings.",
-    "sage_only": "This command is reserved for Sages."
+    "sage_only": "This command is reserved for Sages.",
+    "rate_limited": "You are using this command too often. Please wait {seconds} seconds."
   },
 
   "commands": {

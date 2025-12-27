@@ -74,7 +74,8 @@
 
   "errors": {
     "dm_failed": "Je ne peux pas t'envoyer de message prive. Verifie tes parametres.",
-    "sage_only": "Cette commande est reservee aux Sages."
+    "sage_only": "Cette commande est reservee aux Sages.",
+    "rate_limited": "Tu utilises cette commande trop souvent. Reessaie dans {seconds} secondes."
   },
 
   "commands": {
