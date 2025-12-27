@@ -192,29 +192,28 @@ TIMEOUT_INPUT = int(os.getenv("TIMEOUT_INPUT", "120"))
 
 ## 4. Normalisation
 
-### 🟡 Cohérence du nommage des langues
+### ✅ Cohérence du nommage des langues
 **Problème :** `lang.upper() == "FR"` vs `lang.lower() == "fr"` mélangés
 
 **Solution :**
-- Toujours stocker en minuscules dans la DB
-- Normaliser dès la réception : `lang = lang.lower()`
-- Créer un helper : `utils/i18n.py:normalize_lang()`
+- Convention: toujours en MAJUSCULES (FR, EN)
+- `SUPPORTED_LANGUAGES = ["FR", "EN"]`
+- `get_text()` normalise avec `.upper()`
 
-**Fichiers à modifier :**
-- [ ] `utils/i18n.py` - Ajouter `normalize_lang()`
-- [ ] `cogs/registration.py` - Normaliser à la source
-- [ ] `models/user_profile.py` - Normaliser dans `set_language()`
+**Fichiers modifiés :**
+- [x] `utils/i18n.py` - Normalisation en majuscules ✅
+- [x] `tests/test_utils/test_i18n.py` - Tests mis à jour ✅
 
 ---
 
-### 🟡 Nommage des classes Cog
+### ✅ Nommage des classes Cog
 **Problème :** `PrivateCommands` au lieu de `PrivateCommandsCog`
 
 **Solution :** Renommer pour cohérence :
 - `PrivateCommands` → `PrivateCommandsCog`
 
-**Fichiers à modifier :**
-- [ ] `cogs/private.py` - Renommer la classe
+**Fichiers modifiés :**
+- [x] `cogs/private.py` - Classe renommée ✅
 
 ---
 
@@ -259,14 +258,13 @@ async def find_member_by_name(bot, search: str) -> Optional[discord.Member]:
 
 ---
 
-### 🟢 Nettoyer les TODOs obsolètes
+### ✅ Nettoyer les TODOs obsolètes
 **Problème :** `cogs/events.py:67` - TODO obsolète
 
 **Solution :** Supprimer ou implémenter les TODOs restants
 
-**Fichiers à vérifier :**
-- [ ] `cogs/events.py` - Ligne 67
-- [ ] Grep global pour "TODO" et "FIXME"
+**Résultat :**
+- [x] Aucun TODO/FIXME trouvé dans le code ✅
 
 ---
 
@@ -372,16 +370,17 @@ def geocode_cached(location: str) -> Optional[Location]:
 
 ## 8. Dépendances
 
-### 🟢 Nettoyer requirements
+### ✅ Nettoyer requirements
 **Problème :** `requirements.txt` et `pyproject.toml` se chevauchent
 
 **Solution :**
-- Garder uniquement `pyproject.toml` (moderne)
-- Générer `requirements.txt` si besoin : `pip-compile`
+- Garder uniquement `pyproject.toml` (UV l'utilise directement)
+- Supprimer `requirements.txt`
 
-**Fichiers à modifier :**
-- [ ] `pyproject.toml` - Source unique
-- [ ] `requirements.txt` - Généré ou supprimé
+**Fichiers modifiés :**
+- [x] `pyproject.toml` - Source unique ✅
+- [x] `requirements.txt` - Supprimé ✅
+- [x] `web/` - Supprimé (obsolète, migré vers GitHub Pages) ✅
 
 ---
 
