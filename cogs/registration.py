@@ -229,7 +229,7 @@ class RegistrationCog(commands.Cog):
 
     async def ask_players_for_team(self, member: discord.Member, dm_channel: discord.DMChannel,
                                     team_id: int, team_name: str, lang: str, is_main_team: bool = True):
-        """Demande les joueurs pour une equipe (tous en une fois, separes par des virgules)."""
+        """Demande les joueurs pour une equipe (annule et remplace, separes par des virgules)."""
         username = member.name
 
         if is_main_team:
@@ -244,7 +244,7 @@ class RegistrationCog(commands.Cog):
             msg = await self.bot.wait_for("message", check=check, timeout=Timeouts.PLAYER_INPUT)
             content = msg.content.strip()
 
-            # Si "." ou vide, passer cette equipe
+            # Si "." ou vide, conserver les joueurs existants
             if content == "." or not content:
                 await dm_channel.send(t("players.skipped", lang, team_name=team_name))
                 return
@@ -252,7 +252,8 @@ class RegistrationCog(commands.Cog):
             # Parser les noms separes par des virgules
             player_names = [name.strip() for name in content.split(",") if name.strip()]
 
-            players_added = []
+            # Valider tous les noms avant de supprimer
+            valid_names = []
             for player_name in player_names:
                 if len(player_name) < 2:
                     await dm_channel.send(t("players.name_too_short_skip", lang, player_name=player_name))
@@ -260,17 +261,26 @@ class RegistrationCog(commands.Cog):
                 if len(player_name) > 50:
                     await dm_channel.send(t("players.name_too_long_skip", lang, player_name=player_name))
                     continue
+                valid_names.append(player_name)
 
+            if not valid_names:
+                await dm_channel.send(t("players.skipped", lang, team_name=team_name))
+                return
+
+            # Supprimer les anciens joueurs de cette team (annule et remplace)
+            deleted = await Player.delete_by_team_for_member(self.bot.db_pool, username, team_id)
+            if deleted > 0:
+                logger.debug(f"{deleted} ancien(s) joueur(s) supprime(s) pour {username} (team {team_id})")
+
+            # Ajouter les nouveaux joueurs
+            players_added = []
+            for player_name in valid_names:
                 try:
                     await Player.create(self.bot.db_pool, username, player_name, team_id)
                     players_added.append(player_name)
                 except Exception as e:
-                    error_msg = str(e)
-                    if "unique_player_per_team" in error_msg or "duplicate key" in error_msg.lower():
-                        await dm_channel.send(t("players.player_exists", lang, player_name=player_name))
-                    else:
-                        logger.error(f"Erreur creation joueur: {e}")
-                        await dm_channel.send(t("players.error", lang))
+                    logger.error(f"Erreur creation joueur: {e}")
+                    await dm_channel.send(t("players.error", lang))
 
             if players_added:
                 await dm_channel.send(t("players.count", lang, count=len(players_added), team_name=team_name))

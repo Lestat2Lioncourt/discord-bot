@@ -22,6 +22,7 @@ from utils.i18n import t
 from utils.map_generator import regenerate_map_if_needed
 from config import CHANNEL_GENERAL_ID, CHANNEL_SAGE_ID, DEBUG_MODE, DEBUG_USER
 from constants import Teams, ApprovalStatus
+from utils.discord_helpers import find_member, find_member_strict
 
 logger = get_logger("cogs.sages")
 
@@ -57,26 +58,6 @@ class SagesCog(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
-
-    async def _find_member_by_name(self, ctx, search: str) -> Optional[discord.Member]:
-        """Recherche un membre par nom (partiel, insensible a la casse)."""
-        search = search.strip().lstrip('@').lower()
-
-        # Chercher dans tous les membres du serveur
-        if ctx.guild:
-            for member in ctx.guild.members:
-                if (search in member.name.lower() or
-                    search in (member.display_name or "").lower()):
-                    return member
-
-        # Chercher dans tous les guilds du bot
-        for guild in self.bot.guilds:
-            for member in guild.members:
-                if (search in member.name.lower() or
-                    search in (member.display_name or "").lower()):
-                    return member
-
-        return None
 
     @commands.command(name="pending", aliases=["attente", "inscriptions"])
     @sage_only()
@@ -134,11 +115,10 @@ class SagesCog(commands.Cog):
             sage_profile = await UserProfile.get_or_create_user(ctx.author.name, conn, ctx.author)
         sage_lang = sage_profile.language or "FR"
 
-        # Rechercher le membre
-        member = await self._find_member_by_name(ctx, search)
-        if not member:
-            msg = f"Membre `{search}` non trouve." if sage_lang == "FR" else f"Member `{search}` not found."
-            await ctx.send(msg)
+        # Rechercher le membre (unique requis pour action d'ecriture)
+        member, error = await find_member_strict(self.bot, search, ctx.guild)
+        if error:
+            await ctx.send(error)
             return
 
         await self._validate_member(ctx, member, sage_lang)
@@ -304,11 +284,10 @@ class SagesCog(commands.Cog):
             sage_profile = await UserProfile.get_or_create_user(ctx.author.name, conn, ctx.author)
         sage_lang = sage_profile.language or "FR"
 
-        # Rechercher le membre
-        member = await self._find_member_by_name(ctx, search)
-        if not member:
-            msg = f"Membre `{search}` non trouve." if sage_lang == "FR" else f"Member `{search}` not found."
-            await ctx.send(msg)
+        # Rechercher le membre (unique requis pour action d'ecriture)
+        member, error = await find_member_strict(self.bot, search, ctx.guild)
+        if error:
+            await ctx.send(error)
             return
 
         await self._refuse_member(ctx, member, sage_lang, raison)
