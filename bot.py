@@ -1,5 +1,4 @@
 import discord
-import json
 from discord.ext import commands
 import asyncio
 import asyncpg
@@ -9,7 +8,6 @@ from pathlib import Path
 from config import (
     DISCORD_TOKEN,
     DB_CONFIG,
-    CHARTE_JSON_PATH,
     BOT_PREFIX,
     BASE_DIR,
 )
@@ -279,24 +277,6 @@ async def custom_help(ctx, command_name: str = None):
             await ctx.send(t("help_cmd.unknown_cmd", lang, cmd=command_name))
 
 # ===============================================================================
-# Fonction d'initialisation
-# ===============================================================================
-async def initialize_bot():
-    """Initialise le bot en remplissant la table Charte."""
-    from cogs.admin_commands import AdminCommandsCog
-    admin_cog = AdminCommandsCog(bot)
-
-    if not CHARTE_JSON_PATH.exists():
-        logger.error(f"Le fichier {CHARTE_JSON_PATH} n'existe pas")
-        return
-
-    with open(CHARTE_JSON_PATH, "r", encoding="utf-8") as f:
-        charte_data = json.load(f)
-
-    await admin_cog.db.set_charte(charte_data)
-    logger.info("Table Charte mise à jour avec succès")
-
-# ===============================================================================
 # Gestion des erreurs de commande
 # ===============================================================================
 @bot.event
@@ -322,7 +302,6 @@ async def run_bot():
             await connect_to_db()
             bot.db_pool = db_pool
             await load_cogs()
-            await initialize_bot()
             await bot.start(TOKEN)
         except discord.ConnectionClosed:
             logger.warning("Connexion perdue. Reconnexion dans 5 secondes...")
@@ -347,7 +326,6 @@ if __name__ == "__main__":
                 await connect_to_db()
                 bot.db_pool = db_pool
                 await load_cogs()
-                await initialize_bot()
                 if is_debug_mode():
                     logger.warning("=== MODE DEBUG ACTIVÉ ===")
                 logger.info("Démarrage du bot...")

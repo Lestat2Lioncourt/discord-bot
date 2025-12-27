@@ -10,7 +10,7 @@ from utils.database import Database
 from utils.logger import get_logger
 from utils.roles import assign_newbie_role, is_newbie, is_membre, is_sage
 from utils.i18n import t
-from config import CHARTE_TEXTS, DATA_DIR, CHANNEL_ACCUEIL_ID
+from config import DATA_DIR, CHANNEL_ACCUEIL_ID
 
 logger = get_logger("cogs.events")
 

@@ -4,12 +4,11 @@ from utils.image_processing import process_image
 from utils.logger import get_logger
 from utils.database import Database
 from utils.validators import validate_pseudo, validate_image_attachment
-import json
-import asyncio
 
-from config import CHARTE_JSON_PATH, TEMP_DIR, WEB_URL, SITE_URL
+from config import TEMP_DIR, WEB_URL, SITE_URL
 
 logger = get_logger("cogs.user_commands")
+
 
 class UserCommandsCog(commands.Cog):
     """Commandes accessibles à tous les utilisateurs."""
@@ -17,10 +16,6 @@ class UserCommandsCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.db = Database(bot.db_pool)
-
-        # Charger la structure de la charte (pour les chemins des fichiers)
-        with open(CHARTE_JSON_PATH, "r", encoding="utf-8") as f:
-            self.charte = json.load(f)
 
 
     @commands.command(name="profile")
