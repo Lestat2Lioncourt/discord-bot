@@ -6,16 +6,10 @@ from utils.database import Database
 from utils.validators import validate_pseudo, validate_image_attachment
 import json
 import asyncio
-from datetime import datetime
 
-from config import CHARTE_JSON_PATH, DATA_DIR, TEMP_DIR, WEB_URL
-from models.player import Player
-from utils.map_generator import generate_map as generate_map_file
+from config import CHARTE_JSON_PATH, TEMP_DIR, WEB_URL, SITE_URL
 
 logger = get_logger("cogs.user_commands")
-
-# Chemin du template de carte
-MAP_TEMPLATE_PATH = DATA_DIR / "map_template.html"
 
 class UserCommandsCog(commands.Cog):
     """Commandes accessibles à tous les utilisateurs."""
@@ -217,90 +211,42 @@ class UserCommandsCog(commands.Cog):
             await ctx.send("Erreur lors du traitement de l'image.")
 
     @commands.command(name="carte", aliases=["map", "members-map"])
-    async def generate_map(self, ctx):
-        """Genere une carte interactive des membres avec leur localisation."""
-        await ctx.send("Generation de la carte en cours...")
+    async def show_map(self, ctx):
+        """Affiche le lien vers la carte interactive des membres."""
+        if WEB_URL:
+            embed = discord.Embed(
+                title="🗺️ Carte des membres",
+                description="Carte interactive des membres de la team",
+                url=WEB_URL,
+                color=discord.Color.blue()
+            )
+            embed.add_field(
+                name="Ouvrir la carte",
+                value=f"[Cliquez ici pour voir la carte interactive]({WEB_URL})",
+                inline=False
+            )
+            await ctx.send(embed=embed)
+        else:
+            await ctx.send("La carte n'est pas configuree. Contactez un administrateur.")
 
-        try:
-            # Recuperer les membres avec localisation
-            async with self.bot.db_pool.acquire() as conn:
-                rows = await conn.fetch("""
-                    SELECT username, discord_name, localisation, latitude, longitude
-                    FROM user_profile
-                    WHERE latitude IS NOT NULL AND longitude IS NOT NULL
-                    AND approval_status = 'approved'
-                """)
-
-            if not rows:
-                await ctx.send("Aucun membre n'a renseigne sa localisation.")
-                return
-
-            # Construire les donnees des membres
-            members_data = []
-            for row in rows:
-                username = row['username']
-                display_name = row['discord_name'] or username
-
-                # Recuperer les joueurs de ce membre, separes par equipe
-                players = await Player.get_by_member(self.bot.db_pool, username)
-                team1 = [p.player_name for p in players if p.team_name == "This Is PSG"] if players else []
-                team2 = [p.player_name for p in players if p.team_name == "This Is PSG 2"] if players else []
-
-                members_data.append({
-                    "name": display_name,
-                    "lat": float(row['latitude']),
-                    "lng": float(row['longitude']),
-                    "team1": team1,
-                    "team2": team2
-                })
-
-            # Lire le template
-            with open(MAP_TEMPLATE_PATH, "r", encoding="utf-8") as f:
-                template = f.read()
-
-            # Remplacer les placeholders
-            html_content = template.replace("{{MEMBERS_JSON}}", json.dumps(members_data, ensure_ascii=False))
-            html_content = html_content.replace("{{MEMBER_COUNT}}", str(len(members_data)))
-            html_content = html_content.replace("{{DATE}}", datetime.now().strftime("%d/%m/%Y %H:%M"))
-
-            # Sauvegarder le fichier temporaire
-            map_file = TEMP_DIR / "carte_membres.html"
-            with open(map_file, "w", encoding="utf-8") as f:
-                f.write(html_content)
-
-            # Publier sur GitHub Pages (si configure)
-            await generate_map_file(self.bot.db_pool)
-
-            # Envoyer le lien ou le fichier selon la config
-            if WEB_URL:
-                # Envoyer le lien vers la carte hebergee
-                carte_url = WEB_URL
-                embed = discord.Embed(
-                    title="🗺️ Carte des membres",
-                    description=f"**{len(members_data)}** membres localisés",
-                    url=carte_url,
-                    color=discord.Color.blue()
-                )
-                embed.add_field(
-                    name="Ouvrir la carte",
-                    value=f"[Cliquez ici pour voir la carte interactive]({carte_url})",
-                    inline=False
-                )
-                embed.set_footer(text=f"Mise à jour : {datetime.now().strftime('%d/%m/%Y %H:%M')}")
-                await ctx.send(embed=embed)
-            else:
-                # Pas de serveur web -> envoyer le fichier
-                await ctx.send(
-                    f"Carte generee avec **{len(members_data)}** membres localises.\n"
-                    "Ouvre le fichier dans ton navigateur pour voir la carte interactive.",
-                    file=discord.File(str(map_file), filename="carte_membres.html")
-                )
-
-            logger.info(f"Carte generee par {ctx.author.name}: {len(members_data)} membres")
-
-        except Exception as e:
-            logger.error(f"Erreur generation carte: {e}")
-            await ctx.send("Erreur lors de la generation de la carte.")
+    @commands.command(name="site", aliases=["website", "web"])
+    async def show_site(self, ctx):
+        """Affiche le lien vers le site de la team."""
+        if SITE_URL:
+            embed = discord.Embed(
+                title="🌐 Site This Is PSG",
+                description="Page officielle de la team",
+                url=SITE_URL,
+                color=discord.Color.blue()
+            )
+            embed.add_field(
+                name="Ouvrir le site",
+                value=f"[Cliquez ici pour acceder au site]({SITE_URL})",
+                inline=False
+            )
+            await ctx.send(embed=embed)
+        else:
+            await ctx.send("Le site n'est pas configure. Contactez un administrateur.")
 
 
 async def setup(bot):

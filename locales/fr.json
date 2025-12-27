@@ -98,7 +98,7 @@
     "title": "📚 Commandes disponibles",
     "subtitle": "Utilise `!help <commande>` pour plus de details.",
     "general": "🌐 General",
-    "general_list": "`!help` - Affiche cette aide\n`!langue / !language` - Change ta langue (FR/EN)",
+    "general_list": "`!help` - Affiche cette aide\n`!langue / !language` - Change ta langue (FR/EN)\n`!site` - Lien vers le site de la team",
     "profile": "👤 Inscription & Profil",
     "profile_list": "`!inscription` - Demarre l'inscription\n`!profil` - Affiche ton profil\n`!joueur / !player` - Gere tes joueurs\n`!localisation / !location` - Definit ta position\n`!users / !membres` - Liste des membres\n`!carte / !map` - Carte interactive des membres",
     "sages": "⚖️ Sages (moderateurs)",
