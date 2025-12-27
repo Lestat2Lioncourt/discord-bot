@@ -1,7 +1,7 @@
 # Plan d'évolution technique - Bot Discord This Is PSG
 
 > Document de référence pour les améliorations techniques du projet.
-> Dernière mise à jour : 27/12/2024
+> Derniere mise a jour : 27/12/2024 (PM)
 
 ---
 
@@ -524,20 +524,26 @@ async def audit_permissions(self, ctx):
 6. ✅ Créer `utils/discord_helpers.py`
 7. ⏳ Refactoriser `registration.py` (reporté)
 
-### Phase 3 - Outils de debug/admin ✅ TERMINÉE
+### Phase 3 - Outils de debug/admin ✅ TERMINEE
 8. ✅ Commande `!reset` pour tests
-9. ✅ Commande `!audit-permissions` + documentation
+9. ✅ Commande `!audit-permissions` (par role, format ASCII)
+
+### Phase 3bis - Correctifs et ameliorations ✅ TERMINEE
+10. ✅ Rappel charte a la connexion (Membres/Sages sans charte validee)
+11. ✅ Privacy localisation : `location_display` (pays/region) dans profil-admin
+12. ✅ Nettoyage ancien systeme charte (tables Charte, Validation_charte, charte.json)
+13. ✅ Gestion commande inconnue (`on_command_error`)
 
 ### Phase 4 - Tests
-10. 🔴 Setup pytest
-11. 🟡 Tests des validateurs
-12. 🟡 Tests des modèles
+14. 🔴 Setup pytest
+15. 🟡 Tests des validateurs
+16. 🟡 Tests des modeles
 
-### Phase 5 - Amélioration continue
-13. 🟡 Cache et rate limiting
-14. 🟡 Pydantic pour validation
-15. 🟢 Documentation architecture
-16. 🟢 Nettoyage dépendances
+### Phase 5 - Amelioration continue
+17. 🟡 Cache et rate limiting
+18. 🟡 Pydantic pour validation
+19. 🟢 Documentation architecture
+20. 🟢 Nettoyage dependances
 
 ---
 
@@ -545,8 +551,9 @@ async def audit_permissions(self, ctx):
 
 | Date | Modification | Auteur |
 |------|--------------|--------|
-| 27/12/2024 | Création du document | Claude |
-| 27/12/2024 | Phase 1 terminée : logging, N+1, constants.py | Claude |
-| 27/12/2024 | Ajout section 10 (fonctionnalités) + réorg phases | Claude |
-| 27/12/2024 | Phase 2 + Phase 3 terminées | Claude |
+| 27/12/2024 | Creation du document | Claude |
+| 27/12/2024 | Phase 1 terminee : logging, N+1, constants.py | Claude |
+| 27/12/2024 | Ajout section 10 (fonctionnalites) + reorg phases | Claude |
+| 27/12/2024 | Phase 2 + Phase 3 terminees | Claude |
+| 27/12/2024 | Phase 3bis : rappel charte, privacy loc, nettoyage tables | Claude |
 
