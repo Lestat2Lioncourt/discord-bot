@@ -297,6 +297,23 @@ async def initialize_bot():
     logger.info("Table Charte mise à jour avec succès")
 
 # ===============================================================================
+# Gestion des erreurs de commande
+# ===============================================================================
+@bot.event
+async def on_command_error(ctx, error):
+    """Gere les erreurs de commande."""
+    if isinstance(error, commands.CommandNotFound):
+        cmd = ctx.message.content.split()[0]
+        await ctx.send(f"Commande `{cmd}` inconnue. Tape `!help` pour voir les commandes disponibles.")
+    elif isinstance(error, commands.MissingRequiredArgument):
+        await ctx.send(f"Argument manquant. Tape `!help {ctx.command}` pour voir l'usage.")
+    elif isinstance(error, commands.CheckFailure):
+        # Permission refusee (ex: sage_only, debug_only)
+        pass  # Silencieux, le decorateur gere deja le message
+    else:
+        logger.error(f"Erreur commande {ctx.command}: {error}")
+
+# ===============================================================================
 # Démarrage du bot avec reconnexion automatique en cas de plantage
 # ===============================================================================
 async def run_bot():

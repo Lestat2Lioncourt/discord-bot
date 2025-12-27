@@ -31,6 +31,7 @@ class UserProfile:
         # Champs existants
         self.language = "FR"  # Langue par defaut
         self.localisation = None
+        self.location_display = None  # Pays/region pour affichage anonymise
         self.latitude = None
         self.longitude = None
         self.creation_date = None
@@ -184,7 +185,7 @@ class UserProfile:
     async def load_from_db(self) -> None:
         """Charge les informations complètes depuis la base de données."""
         query = """
-        SELECT language, localisation, latitude, longitude,
+        SELECT language, localisation, location_display, latitude, longitude,
                discord_name, last_connection, creation_date,
                charte_validated, approval_status, username
         FROM user_profile WHERE discord_id = $1
@@ -194,6 +195,7 @@ class UserProfile:
             if result:
                 self.language = result.get("language") or "FR"
                 self.localisation = result["localisation"]
+                self.location_display = result.get("location_display")
                 self.latitude = result["latitude"]
                 self.longitude = result["longitude"]
                 self.discord_name = result["discord_name"]
@@ -227,18 +229,28 @@ class UserProfile:
         self.charte_validated = True
         logger.info(f"Charte validée pour {self.username}")
 
-    async def set_location(self, localisation: str, latitude: float, longitude: float) -> None:
-        """Définit la localisation du membre."""
+    async def set_location(self, localisation: str, latitude: float, longitude: float,
+                           location_display: str = None) -> None:
+        """Définit la localisation du membre.
+
+        Args:
+            localisation: Adresse complete saisie par l'utilisateur
+            latitude: Latitude GPS
+            longitude: Longitude GPS
+            location_display: Affichage anonymise (pays/region) pour profil-admin
+        """
         query = """
         UPDATE user_profile
-        SET localisation = $1, latitude = $2, longitude = $3
-        WHERE discord_id = $4
+        SET localisation = $1, latitude = $2, longitude = $3, location_display = $4
+        WHERE discord_id = $5
         """
-        await self.db_connection.execute(query, localisation, latitude, longitude, self.discord_id)
+        await self.db_connection.execute(query, localisation, latitude, longitude,
+                                          location_display, self.discord_id)
         self.localisation = localisation
         self.latitude = latitude
         self.longitude = longitude
-        logger.info(f"Localisation définie pour {self.username}: {localisation}")
+        self.location_display = location_display
+        logger.info(f"Localisation définie pour {self.username}: {location_display or localisation}")
 
     async def clear_location(self) -> None:
         """Supprime la localisation du membre."""

@@ -532,11 +532,11 @@ class SagesCog(commands.Cog):
                 inline=False
             )
 
-        # Localisation
-        if profile.localisation:
-            loc_str = profile.localisation
-            if profile.latitude and profile.longitude:
-                loc_str += f" ({profile.latitude:.2f}, {profile.longitude:.2f})"
+        # Localisation (affichage anonymise: pays/region + coordonnees GPS)
+        if profile.latitude and profile.longitude:
+            # Utiliser location_display (anonymise) ou fallback sur "Localisation definie"
+            loc_display = profile.location_display or "Localisation definie"
+            loc_str = f"{loc_display} ({profile.latitude:.4f}, {profile.longitude:.4f})"
             embed.add_field(name=t("sages_cmd.profil_admin_location", lang), value=loc_str, inline=False)
 
         # Dates
@@ -555,6 +555,146 @@ class SagesCog(commands.Cog):
 
         # Envoyer en DM
         await ctx.author.send(embed=embed)
+
+    # =========================================================================
+    # Commande !reset (debug uniquement)
+    # =========================================================================
+    @commands.command(name="reset")
+    @debug_only()
+    async def cmd_reset(self, ctx, *, search: str = None):
+        """Reinitialise un membre pour permettre une nouvelle inscription (debug)."""
+        if not search:
+            await ctx.send("**Usage:** `!reset <nom>` (ex: `!reset detrax`)")
+            return
+
+        # Rechercher le membre (unique requis)
+        member, error = await find_member_strict(self.bot, search, ctx.guild)
+        if error:
+            await ctx.send(error)
+            return
+
+        username = member.name
+
+        # Charger le profil
+        async with self.bot.db_pool.acquire() as conn:
+            profile = await UserProfile.get_or_create_user(username, conn, member)
+
+            if not profile:
+                await ctx.send(f"Profil de `{username}` introuvable.")
+                return
+
+            # Reinitialiser le profil
+            await profile.reset()
+
+            # Supprimer tous les joueurs
+            deleted_count = await Player.delete_all_for_member(self.bot.db_pool, username)
+
+            # Retrograder en Newbie si necessaire
+            await demote_to_newbie(member)
+
+        msg = f"✅ **{member.display_name}** reinitialise :\n"
+        msg += f"• Statut : pending\n"
+        msg += f"• Charte : non validee\n"
+        msg += f"• Joueurs supprimes : {deleted_count}\n"
+        msg += f"• Role : Newbie\n"
+        msg += f"\nLe membre peut relancer `!inscription`."
+
+        await ctx.send(msg)
+        logger.info(f"Reset de {username} par {ctx.author.name}")
+
+    # =========================================================================
+    # Commande !audit-permissions
+    # =========================================================================
+    @commands.command(name="audit-permissions", aliases=["audit-perms", "perms"])
+    @sage_only()
+    async def cmd_audit_permissions(self, ctx):
+        """Exporte les permissions par salon et par role."""
+        if not ctx.guild:
+            await ctx.send("Cette commande doit etre utilisee sur un serveur.")
+            return
+
+        guild = ctx.guild
+        await ctx.send("Generation de l'audit des permissions en cours...")
+
+        # Construire le rapport
+        lines = []
+        lines.append(f"# Audit des permissions - {guild.name}")
+        lines.append(f"# Genere le {discord.utils.utcnow().strftime('%Y-%m-%d %H:%M UTC')}")
+        lines.append(f"# Roles: {len(guild.roles)} | Salons: {len(guild.channels)}")
+        lines.append("")
+
+        # Trier les salons par categorie
+        categories = {}
+        no_category = []
+
+        for channel in guild.channels:
+            if isinstance(channel, discord.CategoryChannel):
+                continue
+            if channel.category:
+                if channel.category.name not in categories:
+                    categories[channel.category.name] = []
+                categories[channel.category.name].append(channel)
+            else:
+                no_category.append(channel)
+
+        # Fonction pour formater les permissions
+        def format_perms(channel, role):
+            overwrites = channel.overwrites_for(role)
+            perms = []
+            if overwrites.read_messages is True:
+                perms.append("R")
+            elif overwrites.read_messages is False:
+                perms.append("-R")
+            if overwrites.send_messages is True:
+                perms.append("W")
+            elif overwrites.send_messages is False:
+                perms.append("-W")
+            if overwrites.manage_channels is True:
+                perms.append("M")
+            if overwrites.manage_messages is True:
+                perms.append("Mod")
+            return " ".join(perms) if perms else "."
+
+        # Roles principaux a auditer (exclure @everyone et bots)
+        roles_to_audit = [r for r in guild.roles if r.name not in ["@everyone"] and not r.is_bot_managed()]
+        roles_to_audit.reverse()  # Du plus haut au plus bas
+
+        # Generer le rapport par categorie
+        for cat_name in sorted(categories.keys()):
+            lines.append(f"## {cat_name}")
+            for channel in sorted(categories[cat_name], key=lambda c: c.position):
+                channel_type = "T" if isinstance(channel, discord.TextChannel) else "V"
+                lines.append(f"  [{channel_type}] #{channel.name}")
+                for role in roles_to_audit[:10]:  # Top 10 roles
+                    perms = format_perms(channel, role)
+                    if perms != ".":
+                        lines.append(f"      {role.name}: {perms}")
+            lines.append("")
+
+        if no_category:
+            lines.append("## (Sans categorie)")
+            for channel in no_category:
+                channel_type = "T" if isinstance(channel, discord.TextChannel) else "V"
+                lines.append(f"  [{channel_type}] #{channel.name}")
+
+        # Envoyer en DM (peut etre long)
+        report = "\n".join(lines)
+
+        try:
+            # Si trop long, decouper
+            if len(report) > 1900:
+                chunks = [report[i:i+1900] for i in range(0, len(report), 1900)]
+                await ctx.author.send(f"**Audit des permissions de {guild.name}** ({len(chunks)} parties)")
+                for i, chunk in enumerate(chunks):
+                    await ctx.author.send(f"```\n{chunk}\n```")
+                await ctx.send(f"Audit envoye en DM ({len(chunks)} messages).")
+            else:
+                await ctx.author.send(f"**Audit des permissions de {guild.name}**\n```\n{report}\n```")
+                await ctx.send("Audit envoye en DM.")
+
+            logger.info(f"Audit permissions genere par {ctx.author.name}")
+        except discord.Forbidden:
+            await ctx.send("Impossible d'envoyer le rapport en DM. Verifie que tes DMs sont ouverts.")
 
 
 class ValidationView(View):
@@ -800,143 +940,6 @@ async def notify_sages_returning_member(bot, member: discord.Member, returning_i
                 return
 
         logger.warning("Salon des Sages non trouve pour alerte revenant")
-
-    # =========================================================================
-    # Commande !reset (debug uniquement)
-    # =========================================================================
-    @commands.command(name="reset")
-    @debug_only()
-    async def cmd_reset(self, ctx, *, search: str = None):
-        """Reinitialise un membre pour permettre une nouvelle inscription (debug)."""
-        if not search:
-            await ctx.send("**Usage:** `!reset <nom>` (ex: `!reset detrax`)")
-            return
-
-        # Rechercher le membre (unique requis)
-        member, error = await find_member_strict(self.bot, search, ctx.guild)
-        if error:
-            await ctx.send(error)
-            return
-
-        username = member.name
-
-        # Charger le profil
-        async with self.bot.db_pool.acquire() as conn:
-            profile = await UserProfile.get_or_create_user(username, conn, member)
-
-            if not profile:
-                await ctx.send(f"Profil de `{username}` introuvable.")
-                return
-
-            # Reinitialiser le profil
-            await profile.reset()
-
-            # Supprimer tous les joueurs
-            deleted_count = await Player.delete_all_for_member(self.bot.db_pool, username)
-
-            # Retrograder en Newbie si necessaire
-            await demote_to_newbie(member)
-
-        msg = f"✅ **{member.display_name}** reinitialise :\n"
-        msg += f"• Statut : pending\n"
-        msg += f"• Charte : non validee\n"
-        msg += f"• Joueurs supprimes : {deleted_count}\n"
-        msg += f"• Role : Newbie\n"
-        msg += f"\nLe membre peut relancer `!inscription`."
-
-        await ctx.send(msg)
-        logger.info(f"Reset de {username} par {ctx.author.name}")
-
-    # =========================================================================
-    # Commande !audit-permissions
-    # =========================================================================
-    @commands.command(name="audit-permissions", aliases=["audit-perms", "perms"])
-    @sage_only()
-    async def cmd_audit_permissions(self, ctx):
-        """Exporte les permissions par salon et par role."""
-        if not ctx.guild:
-            await ctx.send("Cette commande doit etre utilisee sur un serveur.")
-            return
-
-        guild = ctx.guild
-        await ctx.send("Generation de l'audit des permissions en cours...")
-
-        # Construire le rapport
-        lines = []
-        lines.append(f"# Audit des permissions - {guild.name}")
-        lines.append(f"# Genere le {discord.utils.utcnow().strftime('%Y-%m-%d %H:%M UTC')}")
-        lines.append(f"# Roles: {len(guild.roles)} | Salons: {len(guild.channels)}")
-        lines.append("")
-
-        # Trier les salons par categorie
-        categories = {}
-        no_category = []
-
-        for channel in guild.channels:
-            if isinstance(channel, discord.CategoryChannel):
-                continue
-            if channel.category:
-                if channel.category.name not in categories:
-                    categories[channel.category.name] = []
-                categories[channel.category.name].append(channel)
-            else:
-                no_category.append(channel)
-
-        # Fonction pour formater les permissions
-        def format_perms(channel, role):
-            overwrites = channel.overwrites_for(role)
-            perms = []
-            if overwrites.read_messages is True:
-                perms.append("R")
-            elif overwrites.read_messages is False:
-                perms.append("-R")
-            if overwrites.send_messages is True:
-                perms.append("W")
-            elif overwrites.send_messages is False:
-                perms.append("-W")
-            if overwrites.manage_channels is True:
-                perms.append("M")
-            if overwrites.manage_messages is True:
-                perms.append("Mod")
-            return " ".join(perms) if perms else "."
-
-        # Roles principaux a auditer (exclure @everyone et bots)
-        roles_to_audit = [r for r in guild.roles if r.name not in ["@everyone"] and not r.is_bot_managed()]
-        roles_to_audit.reverse()  # Du plus haut au plus bas
-
-        # Generer le rapport par categorie
-        for cat_name in sorted(categories.keys()):
-            lines.append(f"## {cat_name}")
-            for channel in sorted(categories[cat_name], key=lambda c: c.position):
-                channel_type = "T" if isinstance(channel, discord.TextChannel) else "V"
-                lines.append(f"  [{channel_type}] #{channel.name}")
-                for role in roles_to_audit[:10]:  # Top 10 roles
-                    perms = format_perms(channel, role)
-                    if perms != ".":
-                        lines.append(f"      {role.name}: {perms}")
-            lines.append("")
-
-        if no_category:
-            lines.append("## (Sans categorie)")
-            for channel in no_category:
-                channel_type = "T" if isinstance(channel, discord.TextChannel) else "V"
-                lines.append(f"  [{channel_type}] #{channel.name}")
-
-        # Envoyer en DM (peut etre long)
-        report = "\n".join(lines)
-
-        # Si trop long, decouper
-        if len(report) > 1900:
-            chunks = [report[i:i+1900] for i in range(0, len(report), 1900)]
-            await ctx.author.send(f"**Audit des permissions de {guild.name}** ({len(chunks)} parties)")
-            for i, chunk in enumerate(chunks):
-                await ctx.author.send(f"```\n{chunk}\n```")
-            await ctx.send(f"Audit envoye en DM ({len(chunks)} messages).")
-        else:
-            await ctx.author.send(f"**Audit des permissions de {guild.name}**\n```\n{report}\n```")
-            await ctx.send("Audit envoye en DM.")
-
-        logger.info(f"Audit permissions genere par {ctx.author.name}")
 
 
 async def setup(bot):

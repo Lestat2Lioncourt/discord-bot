@@ -356,12 +356,16 @@ class RegistrationCog(commands.Cog):
 
         try:
             geolocator = Nominatim(user_agent="discord-bot-this-is-psg")
-            loc = geolocator.geocode(location, timeout=Timeouts.GEOCODING)
+            # addressdetails=True pour obtenir les composants de l'adresse
+            loc = geolocator.geocode(location, timeout=Timeouts.GEOCODING, addressdetails=True)
 
             if loc:
+                # Extraire pays/region pour affichage anonymise
+                location_display = self._extract_location_display(loc.raw.get('address', {}))
+
                 async with self.bot.db_pool.acquire() as conn:
                     profile = await UserProfile.get_or_create_user(username, conn, member)
-                    await profile.set_location(location, loc.latitude, loc.longitude)
+                    await profile.set_location(location, loc.latitude, loc.longitude, location_display)
 
                 coords_info = f"\n📍 Coordonnees: {loc.latitude:.4f}, {loc.longitude:.4f}"
                 await dm_channel.send(t("location.saved", lang, address=loc.address) + coords_info)
@@ -377,6 +381,36 @@ class RegistrationCog(commands.Cog):
 
         await asyncio.sleep(1)
         await self.finish_registration(member, dm_channel, lang)
+
+    def _extract_location_display(self, address: dict) -> str:
+        """Extrait un affichage anonymise (pays + region/etat) depuis les donnees Nominatim.
+
+        Args:
+            address: Dictionnaire des composants d'adresse Nominatim
+
+        Returns:
+            Chaine au format "Pays" ou "Region, Pays"
+        """
+        country = address.get('country', '')
+
+        # Chercher le niveau region/etat/departement selon le pays
+        region = (
+            address.get('state') or           # USA, Allemagne, etc.
+            address.get('region') or          # Certains pays
+            address.get('county') or          # UK
+            address.get('province') or        # Canada, etc.
+            address.get('department') or      # France (plus precis que region)
+            ''
+        )
+
+        if region and country:
+            return f"{region}, {country}"
+        elif country:
+            return country
+        elif region:
+            return region
+        else:
+            return "Localisation definie"
 
     async def finish_registration(self, member: discord.Member, dm_channel: discord.DMChannel, lang: str):
         """Termine l'inscription."""
@@ -579,12 +613,15 @@ class RegistrationCog(commands.Cog):
 
         try:
             geolocator = Nominatim(user_agent="discord-bot-this-is-psg")
-            loc = geolocator.geocode(location, timeout=Timeouts.GEOCODING)
+            loc = geolocator.geocode(location, timeout=Timeouts.GEOCODING, addressdetails=True)
 
             if loc:
+                # Extraire pays/region pour affichage anonymise
+                location_display = self._extract_location_display(loc.raw.get('address', {}))
+
                 async with self.bot.db_pool.acquire() as conn:
                     profile = await UserProfile.get_or_create_user(username, conn, ctx.author)
-                    await profile.set_location(location, loc.latitude, loc.longitude)
+                    await profile.set_location(location, loc.latitude, loc.longitude, location_display)
 
                 # Regenerer la carte si le membre est approuve
                 if profile.is_approved():
