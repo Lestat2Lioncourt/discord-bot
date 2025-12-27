@@ -417,28 +417,127 @@ async with pool.acquire() as conn:
 
 ---
 
+## 10. Fonctionnalités utilisateur
+
+### 🟠 Gestion des joueurs : annule et remplace
+**Problème :** Un membre ne peut pas supprimer un joueur mal orthographié
+
+**Solution :** Lors de la re-saisie des joueurs (via `!inscription` ou `!joueur`), remplacer complètement les joueurs existants au lieu de les ajouter.
+
+```python
+# Flow actuel:
+# 1. Membre a ["Player1", "Playeur2"]  (typo)
+# 2. !joueur -> ajoute "Player2"
+# 3. Résultat: ["Player1", "Playeur2", "Player2"]  # doublon!
+
+# Flow proposé:
+# 1. Membre a ["Player1", "Playeur2"]
+# 2. !joueur -> saisit "Player1, Player2"
+# 3. Résultat: ["Player1", "Player2"]  # remplacé!
+```
+
+**Fichiers à modifier :**
+- [ ] `cogs/registration.py:ask_players_for_team()` - Supprimer avant d'ajouter
+
+---
+
+### 🟡 Commande !reset (debug/test)
+**Problème :** Pour tester l'inscription, il faut modifier la BDD manuellement
+
+**Solution :** Commande `!reset @membre` réservée aux Sages (ou mode debug) :
+- Supprime tous les joueurs du membre
+- Remet `approval_status = pending`
+- Remet `charte_validated = false`
+- Permet de relancer `!inscription` proprement
+
+**Fichiers à créer/modifier :**
+- [ ] `cogs/sages.py` - Ajouter commande `cmd_reset()`
+
+---
+
+### 🔴 Sélection intelligente des utilisateurs
+**Problème :** `_find_member_by_name()` retourne le premier résultat sans avertir si plusieurs correspondent
+
+**Solution :** Créer `utils/discord_helpers.py` avec fonction intelligente :
+
+```python
+async def find_member(bot, search: str, require_unique: bool = False):
+    """
+    Cherche par username OU display_name.
+
+    Returns:
+        (members_list, warning_message)
+        Si require_unique=True et plusieurs résultats -> (None, error)
+    """
+```
+
+**Règle simple :**
+- **Lecture/affichage** → plusieurs membres OK
+- **Écriture/modification** → un seul membre à la fois
+
+**Cas d'utilisation identifiés :**
+
+| Commande | `require_unique` | Type | Raison |
+|----------|------------------|------|--------|
+| `!valider @nom` | `True` | Écriture | Promotion irréversible |
+| `!refuser @nom` | `True` | Écriture | Action destructive |
+| `!reset @nom` | `True` | Écriture | Suppression données |
+| `!profil-admin @nom` | `False` | Lecture | Affichage uniquement |
+
+**Fichiers à créer/modifier :**
+- [ ] `utils/discord_helpers.py` - Nouvelle fonction `find_member()`
+- [ ] `cogs/sages.py` - Utiliser la nouvelle fonction
+
+---
+
+### 🟢 Export des permissions Discord
+**Problème :** Pas de vue d'ensemble des droits par salon/rôle
+
+**Solution :** Commande `!audit-permissions` (Sages uniquement) :
+- Liste tous les salons avec leurs permissions par rôle
+- Exporte en CSV ou fichier texte
+- Documente les overwrites spécifiques
+
+```python
+@commands.command(name="audit-permissions")
+@sage_only()
+async def audit_permissions(self, ctx):
+    """Exporte les permissions par salon et par rôle en CSV."""
+```
+
+**Fichiers à créer/modifier :**
+- [ ] `cogs/sages.py` - Ajouter commande
+- [ ] `docs/COMMANDS.md` - Documenter la commande
+
+---
+
 ## Ordre de priorité suggéré
 
-### Phase 1 - Stabilisation (1-2 jours)
-1. 🔴 Ajouter logging aux try/except
-2. 🔴 Corriger les requêtes N+1
-3. 🟠 Créer `constants.py`
+### Phase 1 - Stabilisation ✅ TERMINÉE
+1. ✅ Ajouter logging aux try/except
+2. ✅ Corriger les requêtes N+1
+3. ✅ Créer `constants.py`
 
-### Phase 2 - Qualité (3-5 jours)
-4. 🟠 Refactoriser `registration.py`
-5. 🟠 Créer `utils/discord_helpers.py`
-6. 🟠 Ajouter docstrings prioritaires
+### Phase 2 - Qualité du code
+4. 🔴 **Sélection intelligente utilisateurs** - Critique pour éviter erreurs
+5. 🟠 Gestion joueurs : annule et remplace
+6. 🟠 Créer `utils/discord_helpers.py` (regroupe fonctions communes)
+7. 🟠 Refactoriser `registration.py` (découpage en modules)
 
-### Phase 3 - Tests (2-3 jours)
-7. 🔴 Setup pytest
-8. 🟡 Tests des validateurs
-9. 🟡 Tests des modèles
+### Phase 3 - Outils de debug/admin
+8. 🟡 Commande `!reset` pour tests
+9. 🟢 Commande `!audit-permissions` + documentation
 
-### Phase 4 - Amélioration continue
-10. 🟡 Cache et rate limiting
-11. 🟡 Pydantic pour validation
-12. 🟢 Documentation architecture
-13. 🟢 Nettoyage dépendances
+### Phase 4 - Tests
+10. 🔴 Setup pytest
+11. 🟡 Tests des validateurs
+12. 🟡 Tests des modèles
+
+### Phase 5 - Amélioration continue
+13. 🟡 Cache et rate limiting
+14. 🟡 Pydantic pour validation
+15. 🟢 Documentation architecture
+16. 🟢 Nettoyage dépendances
 
 ---
 
@@ -448,4 +547,5 @@ async with pool.acquire() as conn:
 |------|--------------|--------|
 | 27/12/2024 | Création du document | Claude |
 | 27/12/2024 | Phase 1 terminée : logging, N+1, constants.py | Claude |
+| 27/12/2024 | Ajout section 10 (fonctionnalités) + réorg phases | Claude |
 
