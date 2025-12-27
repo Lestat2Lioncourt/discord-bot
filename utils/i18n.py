@@ -16,8 +16,8 @@ logger = get_logger("i18n")
 LOCALES_DIR = BASE_DIR / "locales"
 TRANSLATIONS = {}
 
-SUPPORTED_LANGUAGES = ["fr", "en"]
-DEFAULT_LANGUAGE = "fr"
+SUPPORTED_LANGUAGES = ["FR", "EN"]
+DEFAULT_LANGUAGE = "FR"
 
 
 def load_translations():
@@ -25,7 +25,8 @@ def load_translations():
     global TRANSLATIONS
 
     for lang in SUPPORTED_LANGUAGES:
-        file_path = LOCALES_DIR / f"{lang}.json"
+        # Fichiers en minuscules (fr.json, en.json), cles en majuscules
+        file_path = LOCALES_DIR / f"{lang.lower()}.json"
         if file_path.exists():
             with open(file_path, "r", encoding="utf-8") as f:
                 TRANSLATIONS[lang] = json.load(f)
@@ -49,8 +50,8 @@ def get_text(key: str, lang: str = None, **kwargs) -> str:
     if not TRANSLATIONS:
         load_translations()
 
-    # Normaliser en minuscules
-    lang = (lang or DEFAULT_LANGUAGE).lower()
+    # Normaliser en majuscules (convention: FR, EN)
+    lang = (lang or DEFAULT_LANGUAGE).upper()
     if lang not in TRANSLATIONS:
         lang = DEFAULT_LANGUAGE
 
@@ -88,14 +89,16 @@ class Translator:
     """Classe helper pour traduire avec une langue fixe."""
 
     def __init__(self, lang: str = None):
-        self.lang = lang or DEFAULT_LANGUAGE
+        self.lang = (lang or DEFAULT_LANGUAGE).upper()
 
     def __call__(self, key: str, **kwargs) -> str:
         return get_text(key, self.lang, **kwargs)
 
     def set_lang(self, lang: str):
-        if lang in SUPPORTED_LANGUAGES:
-            self.lang = lang
+        """Change la langue du traducteur."""
+        normalized = lang.upper() if lang else DEFAULT_LANGUAGE
+        if normalized in SUPPORTED_LANGUAGES:
+            self.lang = normalized
 
 
 # Charger les traductions au import

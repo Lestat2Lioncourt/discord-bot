@@ -18,9 +18,9 @@ class TestGetText:
         # Sauvegarder les vraies traductions
         original_translations = i18n_module.TRANSLATIONS.copy()
 
-        # Injecter des traductions de test
+        # Injecter des traductions de test (cles en majuscules)
         i18n_module.TRANSLATIONS = {
-            "fr": {
+            "FR": {
                 "welcome": {
                     "title": "Bienvenue",
                     "message": "Bonjour {name} !",
@@ -30,7 +30,7 @@ class TestGetText:
                 },
                 "simple": "Texte simple"
             },
-            "en": {
+            "EN": {
                 "welcome": {
                     "title": "Welcome",
                     "message": "Hello {name}!",
@@ -121,8 +121,8 @@ class TestTranslator:
         """Setup des traductions de test."""
         original_translations = i18n_module.TRANSLATIONS.copy()
         i18n_module.TRANSLATIONS = {
-            "fr": {"hello": "Bonjour", "name": "Nom: {value}"},
-            "en": {"hello": "Hello", "name": "Name: {value}"}
+            "FR": {"hello": "Bonjour", "name": "Nom: {value}"},
+            "EN": {"hello": "Hello", "name": "Name: {value}"}
         }
         yield
         i18n_module.TRANSLATIONS = original_translations
@@ -152,9 +152,9 @@ class TestTranslator:
 
     def test_translator_set_lang_invalid(self):
         """set_lang ignore les langues non supportees."""
-        tr = i18n_module.Translator("fr")
+        tr = i18n_module.Translator("FR")
         tr.set_lang("de")  # Non supporte
-        assert tr.lang == "fr"  # Reste en FR
+        assert tr.lang == "FR"  # Reste en FR
 
 
 class TestLoadTranslations:
@@ -162,9 +162,9 @@ class TestLoadTranslations:
 
     def test_supported_languages(self):
         """Verifie les langues supportees."""
-        assert "fr" in i18n_module.SUPPORTED_LANGUAGES
-        assert "en" in i18n_module.SUPPORTED_LANGUAGES
+        assert "FR" in i18n_module.SUPPORTED_LANGUAGES
+        assert "EN" in i18n_module.SUPPORTED_LANGUAGES
 
     def test_default_language(self):
         """Verifie la langue par defaut."""
-        assert i18n_module.DEFAULT_LANGUAGE == "fr"
+        assert i18n_module.DEFAULT_LANGUAGE == "FR"
