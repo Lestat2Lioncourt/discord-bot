@@ -42,7 +42,8 @@
     "skipped": "No player for {team_name}.",
     "name_too_short_skip": "Name too short, skipped: {player_name}",
     "name_too_long_skip": "Name too long, skipped: {player_name}",
-    "player_exists": "Player **{player_name}** already exists.",
+    "duplicate_in_input": "Player **{player_name}** entered twice for {team_name}, skipped.",
+    "already_exists": "Member **{member}** already has a player named **{player_name}** in {team_name}.",
     "error": "Error adding player.",
     "timeout": "Time expired, moving on...",
     "count": "✓ {count} player(s) added to {team_name}"
@@ -102,7 +103,7 @@
     "profile": "👤 Registration & Profile",
     "profile_list": "`!inscription` - Start registration\n`!profil` - Show your profile\n`!player / !joueur` - Manage your players\n`!location / !localisation` - Set your location\n`!users / !membres` - List members\n`!map / !carte` - Interactive members map",
     "sages": "⚖️ Sages (moderators)",
-    "sages_list": "`!pending / !attente` - Pending registrations\n`!approve / !valider` - Approve a member\n`!refuse / !refuser` - Reject a member\n`!profil-admin @user` - Full profile",
+    "sages_list": "`!pending / !attente` - Pending registrations\n`!approve / !valider` - Approve a member\n`!refuse / !refuser` - Reject a member\n`!profil-admin @user` - Full profile\n`!audit-permissions` - Permissions audit",
     "footer": "This Is PSG - Tennis Clash Team",
     "cmd_title": "📖 Command `!{cmd}`",
     "description": "Description",

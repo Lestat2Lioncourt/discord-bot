@@ -212,6 +212,20 @@ async def custom_help(ctx, command_name: str = None):
             "aliases": "!profile-admin",
             "sage": True
         },
+        "audit-permissions": {
+            "desc_fr": "Exporte les permissions par salon et par role.",
+            "desc_en": "Export permissions by channel and role.",
+            "usage": "!audit-permissions",
+            "aliases": "!audit-perms, !perms",
+            "sage": True
+        },
+        "reset": {
+            "desc_fr": "Reinitialise un membre pour tests (debug uniquement).",
+            "desc_en": "Reset a member for testing (debug only).",
+            "usage": "!reset @member",
+            "aliases": "-",
+            "sage": True
+        },
     }
 
     if command_name is None:

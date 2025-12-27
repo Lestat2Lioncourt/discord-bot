@@ -254,6 +254,7 @@ class RegistrationCog(commands.Cog):
 
             # Valider tous les noms avant de supprimer
             valid_names = []
+            seen_names = set()  # Pour detecter les doublons dans la saisie
             for player_name in player_names:
                 if len(player_name) < 2:
                     await dm_channel.send(t("players.name_too_short_skip", lang, player_name=player_name))
@@ -261,6 +262,12 @@ class RegistrationCog(commands.Cog):
                 if len(player_name) > 50:
                     await dm_channel.send(t("players.name_too_long_skip", lang, player_name=player_name))
                     continue
+                # Verifier doublon dans la meme saisie (insensible a la casse)
+                name_lower = player_name.lower()
+                if name_lower in seen_names:
+                    await dm_channel.send(t("players.duplicate_in_input", lang, player_name=player_name, team_name=team_name))
+                    continue
+                seen_names.add(name_lower)
                 valid_names.append(player_name)
 
             if not valid_names:
@@ -279,8 +286,12 @@ class RegistrationCog(commands.Cog):
                     await Player.create(self.bot.db_pool, username, player_name, team_id)
                     players_added.append(player_name)
                 except Exception as e:
-                    logger.error(f"Erreur creation joueur: {e}")
-                    await dm_channel.send(t("players.error", lang))
+                    error_msg = str(e).lower()
+                    if "unique" in error_msg or "duplicate" in error_msg:
+                        await dm_channel.send(t("players.already_exists", lang, member=username, player_name=player_name, team_name=team_name))
+                    else:
+                        logger.error(f"Erreur creation joueur: {e}")
+                        await dm_channel.send(t("players.error", lang))
 
             if players_added:
                 await dm_channel.send(t("players.count", lang, count=len(players_added), team_name=team_name))

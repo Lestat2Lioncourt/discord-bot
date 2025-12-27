@@ -300,6 +300,18 @@ class UserProfile:
         self.approval_status = "refused"
         logger.info(f"Membre {self.username} refusé")
 
+    async def reset(self) -> None:
+        """Reinitialise le profil pour permettre une nouvelle inscription."""
+        query = """
+        UPDATE user_profile
+        SET approval_status = 'pending', charte_validated = FALSE
+        WHERE discord_id = $1
+        """
+        await self.db_connection.execute(query, self.discord_id)
+        self.approval_status = "pending"
+        self.charte_validated = False
+        logger.info(f"Profil {self.username} reinitialise")
+
     @staticmethod
     async def get_pending_members(db_pool) -> list:
         """Récupère tous les membres en attente d'approbation."""

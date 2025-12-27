@@ -42,7 +42,8 @@
     "skipped": "Aucun joueur pour {team_name}.",
     "name_too_short_skip": "Nom trop court ignore : {player_name}",
     "name_too_long_skip": "Nom trop long ignore : {player_name}",
-    "player_exists": "Le joueur **{player_name}** existe deja.",
+    "duplicate_in_input": "Joueur **{player_name}** saisi en double pour {team_name}, ignore.",
+    "already_exists": "Le membre **{member}** a deja un joueur nomme **{player_name}** dans {team_name}.",
     "error": "Erreur lors de l'ajout.",
     "timeout": "Temps ecoule, on continue...",
     "count": "✓ {count} joueur(s) ajoute(s) dans {team_name}"
@@ -102,7 +103,7 @@
     "profile": "👤 Inscription & Profil",
     "profile_list": "`!inscription` - Demarre l'inscription\n`!profil` - Affiche ton profil\n`!joueur / !player` - Gere tes joueurs\n`!localisation / !location` - Definit ta position\n`!users / !membres` - Liste des membres\n`!carte / !map` - Carte interactive des membres",
     "sages": "⚖️ Sages (moderateurs)",
-    "sages_list": "`!pending / !attente` - Inscriptions en attente\n`!valider / !approve` - Valide un membre\n`!refuser / !refuse` - Refuse un membre\n`!profil-admin @user` - Profil complet",
+    "sages_list": "`!pending / !attente` - Inscriptions en attente\n`!valider / !approve` - Valide un membre\n`!refuser / !refuse` - Refuse un membre\n`!profil-admin @user` - Profil complet\n`!audit-permissions` - Audit des droits",
     "footer": "This Is PSG - Tennis Clash Team",
     "cmd_title": "📖 Commande `!{cmd}`",
     "description": "Description",

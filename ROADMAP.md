@@ -518,15 +518,15 @@ async def audit_permissions(self, ctx):
 2. ✅ Corriger les requêtes N+1
 3. ✅ Créer `constants.py`
 
-### Phase 2 - Qualité du code
-4. 🔴 **Sélection intelligente utilisateurs** - Critique pour éviter erreurs
-5. 🟠 Gestion joueurs : annule et remplace
-6. 🟠 Créer `utils/discord_helpers.py` (regroupe fonctions communes)
-7. 🟠 Refactoriser `registration.py` (découpage en modules)
+### Phase 2 - Qualité du code ✅ TERMINÉE
+4. ✅ Sélection intelligente utilisateurs
+5. ✅ Gestion joueurs : annule et remplace
+6. ✅ Créer `utils/discord_helpers.py`
+7. ⏳ Refactoriser `registration.py` (reporté)
 
-### Phase 3 - Outils de debug/admin
-8. 🟡 Commande `!reset` pour tests
-9. 🟢 Commande `!audit-permissions` + documentation
+### Phase 3 - Outils de debug/admin ✅ TERMINÉE
+8. ✅ Commande `!reset` pour tests
+9. ✅ Commande `!audit-permissions` + documentation
 
 ### Phase 4 - Tests
 10. 🔴 Setup pytest
@@ -548,4 +548,5 @@ async def audit_permissions(self, ctx):
 | 27/12/2024 | Création du document | Claude |
 | 27/12/2024 | Phase 1 terminée : logging, N+1, constants.py | Claude |
 | 27/12/2024 | Ajout section 10 (fonctionnalités) + réorg phases | Claude |
+| 27/12/2024 | Phase 2 + Phase 3 terminées | Claude |
 
