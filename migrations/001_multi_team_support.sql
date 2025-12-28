@@ -99,30 +99,43 @@ END $$;
 -- 5. Migrer les données existantes
 -- -----------------------------------------------------------------------------
 
--- 5.1 Migrer game_name vers players (si game_name contient des données)
--- On suppose que les anciens game_name sont pour "This Is PSG" (team_id = 1)
-INSERT INTO players (member_username, team_id, player_name)
-SELECT username, 1, game_name
-FROM user_profile
-WHERE game_name IS NOT NULL
-  AND game_name != ''
-  AND NOT EXISTS (
-      SELECT 1 FROM players p
-      WHERE p.member_username = user_profile.username
-        AND p.player_name = user_profile.game_name
-  );
+-- 5.1 Migrer game_name vers players (si la colonne existe)
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'user_profile' AND column_name = 'game_name'
+    ) THEN
+        INSERT INTO players (member_username, team_id, player_name)
+        SELECT username, 1, game_name
+        FROM user_profile
+        WHERE game_name IS NOT NULL
+          AND game_name != ''
+          AND NOT EXISTS (
+              SELECT 1 FROM players p
+              WHERE p.member_username = user_profile.username
+                AND p.player_name = user_profile.game_name
+          );
+    END IF;
+END $$;
 
--- 5.2 Migrer validation_charte vers charte_validated
--- Un utilisateur est considéré comme ayant validé si toutes ses validations sont à 1
-UPDATE user_profile up
-SET charte_validated = TRUE
-WHERE EXISTS (
-    SELECT 1 FROM validation_charte vc
-    WHERE vc.username = up.username
-    GROUP BY vc.username
-    HAVING COUNT(*) = (SELECT COUNT(*) FROM charte)
-       AND SUM(CASE WHEN vc.validation = 1 THEN 1 ELSE 0 END) = COUNT(*)
-);
+-- 5.2 Migrer validation_charte vers charte_validated (si les tables existent)
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'validation_charte')
+       AND EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'charte')
+    THEN
+        UPDATE user_profile up
+        SET charte_validated = TRUE
+        WHERE EXISTS (
+            SELECT 1 FROM validation_charte vc
+            WHERE vc.username = up.username
+            GROUP BY vc.username
+            HAVING COUNT(*) = (SELECT COUNT(*) FROM charte)
+               AND SUM(CASE WHEN vc.validation = 1 THEN 1 ELSE 0 END) = COUNT(*)
+        );
+    END IF;
+END $$;
 
 -- 5.3 Marquer les anciens membres comme approuvés (si charte validée)
 UPDATE user_profile
