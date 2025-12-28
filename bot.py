@@ -68,8 +68,19 @@ async def load_cogs():
         logger.error(f"Le dossier {cogs_dir} n'existe pas. Aucun cog n'a été chargé.")
         return
 
+    cog_names = []
+
+    # Fichiers .py (sauf __init__.py)
     for filepath in cogs_dir.glob("*.py"):
-        cog_name = filepath.stem  # Nom du fichier sans extension
+        if filepath.name != "__init__.py":
+            cog_names.append(filepath.stem)
+
+    # Packages (dossiers avec __init__.py)
+    for dirpath in cogs_dir.iterdir():
+        if dirpath.is_dir() and (dirpath / "__init__.py").exists():
+            cog_names.append(dirpath.name)
+
+    for cog_name in cog_names:
         try:
             await bot.load_extension(f"cogs.{cog_name}")
             logger.info(f"Cog '{cog_name}' chargé avec succès")
