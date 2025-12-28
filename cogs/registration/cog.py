@@ -12,21 +12,18 @@ Flow:
 
 import discord
 from discord.ext import commands
-from discord import ButtonStyle, Interaction
-from discord.ui import Button, View
-from typing import Optional, List
 import asyncio
 
 from models.user_profile import UserProfile
-from models.player import Player, Team
+from models.player import Player
+from constants import Teams, Timeouts
 from utils.database import Database
 from utils.logger import get_logger
-from utils.roles import is_newbie, is_membre, is_sage
-from utils.i18n import t, Translator
-from cogs.sages import notify_sages_new_registration, notify_sages_returning_member
+from utils.i18n import t
 from utils.map_generator import regenerate_map_if_needed
-from config import CHARTE_FILES, DATA_DIR, CHANNEL_ACCUEIL_ID
-from constants import Teams, Timeouts, ApprovalStatus
+from config import CHARTE_FILES
+from cogs.sages import notify_sages_new_registration, notify_sages_returning_member
+from .views import LanguageSelectView, CharteAcceptView, KeepOrResetView
 
 logger = get_logger("cogs.registration")
 
@@ -38,6 +35,10 @@ class RegistrationCog(commands.Cog):
         self.bot = bot
         self.db = Database(bot.db_pool)
         self.active_registrations = {}  # username -> step
+
+    # =========================================================================
+    # Etapes d'inscription
+    # =========================================================================
 
     async def start_registration(self, member: discord.Member):
         """Demarre le processus d'inscription pour un membre."""
@@ -111,7 +112,7 @@ class RegistrationCog(commands.Cog):
         await dm_channel.send(t("charte.intro", lang))
         await asyncio.sleep(0.5)
 
-        # Envoyer le fichier HTML (clés en minuscules)
+        # Envoyer le fichier HTML (cles en minuscules)
         charte_file = CHARTE_FILES.get(lang.lower(), CHARTE_FILES["fr"])
         if charte_file.exists():
             file = discord.File(charte_file, filename=f"charte_{lang}.html")
@@ -370,6 +371,9 @@ class RegistrationCog(commands.Cog):
                 coords_info = f"\n📍 Coordonnees: {loc.latitude:.4f}, {loc.longitude:.4f}"
                 await dm_channel.send(t("location.saved", lang, address=loc.address) + coords_info)
                 await dm_channel.send(t("location.map_update", lang))
+
+                # Regenerer la carte (seuls les membres approuves y apparaitront)
+                await regenerate_map_if_needed(self.bot.db_pool)
             else:
                 await dm_channel.send(t("location.not_found", lang))
 
@@ -455,6 +459,35 @@ class RegistrationCog(commands.Cog):
         )
         if returning_info:
             await notify_sages_returning_member(self.bot, member, returning_info)
+
+    async def start_player_registration(self, member: discord.Member, dm_channel: discord.DMChannel, lang: str):
+        """Demarre uniquement la saisie des joueurs (sans charte)."""
+        username = member.name
+
+        await dm_channel.send("═" * 35)
+        title = "🎾 **GESTION DE TES JOUEURS** 🎾" if lang.upper() == "FR" else "🎾 **MANAGE YOUR PLAYERS** 🎾"
+        await dm_channel.send(title)
+        await asyncio.sleep(0.5)
+
+        # Team 1
+        await self.ask_players_for_team(member, dm_channel, Teams.TEAM1_ID, Teams.TEAM1_NAME, lang, is_main_team=True)
+
+        # Team 2
+        await self.ask_players_for_team(member, dm_channel, Teams.TEAM2_ID, Teams.TEAM2_NAME, lang, is_main_team=False)
+
+        # Resume
+        players = await Player.get_by_member(self.bot.db_pool, username)
+        if players:
+            msg = t("finish.your_players", lang) + "\n"
+            for p in players:
+                msg += f"- {p.player_name} ({p.team_name})\n"
+            await dm_channel.send(msg)
+        else:
+            await dm_channel.send(t("commands.no_players", lang))
+
+    # =========================================================================
+    # Commandes
+    # =========================================================================
 
     @commands.command(name="inscription")
     async def cmd_inscription(self, ctx):
@@ -555,31 +588,6 @@ class RegistrationCog(commands.Cog):
         except discord.Forbidden:
             await ctx.send(t("errors.dm_failed", lang))
 
-    async def start_player_registration(self, member: discord.Member, dm_channel: discord.DMChannel, lang: str):
-        """Demarre uniquement la saisie des joueurs (sans charte)."""
-        username = member.name
-
-        await dm_channel.send("═" * 35)
-        title = "🎾 **GESTION DE TES JOUEURS** 🎾" if lang.upper() == "FR" else "🎾 **MANAGE YOUR PLAYERS** 🎾"
-        await dm_channel.send(title)
-        await asyncio.sleep(0.5)
-
-        # Team 1
-        await self.ask_players_for_team(member, dm_channel, Teams.TEAM1_ID, Teams.TEAM1_NAME, lang, is_main_team=True)
-
-        # Team 2
-        await self.ask_players_for_team(member, dm_channel, Teams.TEAM2_ID, Teams.TEAM2_NAME, lang, is_main_team=False)
-
-        # Resume
-        players = await Player.get_by_member(self.bot.db_pool, username)
-        if players:
-            msg = t("finish.your_players", lang) + "\n"
-            for p in players:
-                msg += f"- {p.player_name} ({p.team_name})\n"
-            await dm_channel.send(msg)
-        else:
-            await dm_channel.send(t("commands.no_players", lang))
-
     @commands.command(name="localisation")
     async def cmd_localisation(self, ctx, *, location: str = None):
         """Definit ta localisation. Usage: !localisation MaVille"""
@@ -623,13 +631,11 @@ class RegistrationCog(commands.Cog):
                     profile = await UserProfile.get_or_create_user(username, conn, ctx.author)
                     await profile.set_location(location, loc.latitude, loc.longitude, location_display)
 
-                # Regenerer la carte si le membre est approuve
-                if profile.is_approved():
-                    await regenerate_map_if_needed(self.bot.db_pool)
-                    await ctx.send(t("location.saved", lang, address=loc.address))
-                    await ctx.send(t("location.map_update", lang))
-                else:
-                    await ctx.send(t("location.saved", lang, address=loc.address))
+                await ctx.send(t("location.saved", lang, address=loc.address))
+                await ctx.send(t("location.map_update", lang))
+
+                # Regenerer la carte (seuls les membres approuves y apparaitront)
+                await regenerate_map_if_needed(self.bot.db_pool)
             else:
                 await ctx.send(t("location.not_found", lang))
 
@@ -661,120 +667,3 @@ class RegistrationCog(commands.Cog):
                 await msg.edit(content=t("langue_cmd.set_fr", "FR"), view=None)
             else:
                 await msg.edit(content=t("langue_cmd.set_en", "EN"), view=None)
-
-
-# =============================================================================
-# Views
-# =============================================================================
-
-class LanguageSelectView(View):
-    """Vue pour choisir la langue."""
-
-    def __init__(self, member: discord.Member):
-        super().__init__(timeout=Timeouts.LANGUAGE_SELECT)
-        self.member = member
-        self.language = None
-
-    @discord.ui.button(label="🇫🇷", style=ButtonStyle.primary)
-    async def french(self, interaction: Interaction, button: Button):
-        await interaction.response.defer()
-        if interaction.user != self.member:
-            return
-        self.language = "FR"
-        try:
-            await interaction.message.edit(content="🇫🇷 Francais selectionne", view=None)
-        except Exception as e:
-            logger.debug(f"Impossible de modifier le message de selection de langue: {e}")
-        self.stop()
-
-    @discord.ui.button(label="🇬🇧", style=ButtonStyle.primary)
-    async def english(self, interaction: Interaction, button: Button):
-        await interaction.response.defer()
-        if interaction.user != self.member:
-            return
-        self.language = "EN"
-        try:
-            await interaction.message.edit(content="🇬🇧 English selected", view=None)
-        except Exception as e:
-            logger.debug(f"Impossible de modifier le message de selection de langue: {e}")
-        self.stop()
-
-
-class CharteAcceptView(View):
-    """Vue pour accepter/refuser la charte."""
-
-    def __init__(self, member: discord.Member, lang: str = "fr"):
-        super().__init__(timeout=Timeouts.CHARTE_READ)
-        self.member = member
-        self.lang = lang
-        self.accepted = False
-
-        # Modifier les labels des boutons selon la langue
-        self.accept_btn.label = t("charte.accept_button", lang)
-        self.refuse_btn.label = t("charte.refuse_button", lang)
-
-    @discord.ui.button(label="J'accepte", style=ButtonStyle.green, custom_id="accept")
-    async def accept_btn(self, interaction: Interaction, button: Button):
-        await interaction.response.defer()
-        if interaction.user != self.member:
-            return
-        self.accepted = True
-        try:
-            await interaction.message.edit(content="✅", view=None)
-        except Exception as e:
-            logger.debug(f"Impossible de modifier le message d'acceptation de charte: {e}")
-        self.stop()
-
-    @discord.ui.button(label="Je refuse", style=ButtonStyle.red, custom_id="refuse")
-    async def refuse_btn(self, interaction: Interaction, button: Button):
-        await interaction.response.defer()
-        if interaction.user != self.member:
-            return
-        self.accepted = False
-        try:
-            await interaction.message.edit(content="❌", view=None)
-        except Exception as e:
-            logger.debug(f"Impossible de modifier le message de refus de charte: {e}")
-        self.stop()
-
-
-class KeepOrResetView(View):
-    """Vue pour choisir de conserver ou effacer les joueurs existants."""
-
-    def __init__(self, member: discord.Member, lang: str = "fr"):
-        super().__init__(timeout=Timeouts.KEEP_OR_RESET)
-        self.member = member
-        self.lang = lang
-        self.keep = None
-
-        self.keep_btn.label = t("profile.keep_button", lang)
-        self.reset_btn.label = t("profile.reset_button", lang)
-
-    @discord.ui.button(label="Conserver", style=ButtonStyle.green, custom_id="keep")
-    async def keep_btn(self, interaction: Interaction, button: Button):
-        await interaction.response.defer()
-        if interaction.user != self.member:
-            return
-        self.keep = True
-        try:
-            await interaction.message.edit(content=t("profile.players_kept", self.lang), view=None)
-        except Exception as e:
-            logger.debug(f"Impossible de modifier le message de conservation des joueurs: {e}")
-        self.stop()
-
-    @discord.ui.button(label="Tout effacer", style=ButtonStyle.red, custom_id="reset")
-    async def reset_btn(self, interaction: Interaction, button: Button):
-        await interaction.response.defer()
-        if interaction.user != self.member:
-            return
-        self.keep = False
-        try:
-            await interaction.message.edit(content=t("profile.players_deleted", self.lang), view=None)
-        except Exception as e:
-            logger.debug(f"Impossible de modifier le message de suppression des joueurs: {e}")
-        self.stop()
-
-
-async def setup(bot):
-    """Ajoute le cog au bot."""
-    await bot.add_cog(RegistrationCog(bot))

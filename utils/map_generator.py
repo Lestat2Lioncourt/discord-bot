@@ -41,13 +41,12 @@ async def generate_map(db_pool) -> Optional[Path]:
         # Import ici pour eviter les imports circulaires
         from models.player import Player
 
-        # Recuperer les membres avec localisation
+        # Recuperer tous les membres avec localisation (peu importe le statut)
         async with db_pool.acquire() as conn:
             rows = await conn.fetch("""
                 SELECT username, discord_name, localisation, latitude, longitude
                 FROM user_profile
                 WHERE latitude IS NOT NULL AND longitude IS NOT NULL
-                AND approval_status = 'approved'
             """)
 
         if not rows:
