@@ -3,7 +3,14 @@
 
 -- D'abord, ajouter une contrainte unique sur discord_id dans user_profile
 -- (necessaire pour la foreign key)
-ALTER TABLE user_profile ADD CONSTRAINT user_profile_discord_id_unique UNIQUE (discord_id);
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'user_profile_discord_id_unique'
+    ) THEN
+        ALTER TABLE user_profile ADD CONSTRAINT user_profile_discord_id_unique UNIQUE (discord_id);
+    END IF;
+END $$;
 
 -- Table pour stocker l'historique des usernames
 CREATE TABLE IF NOT EXISTS username_history (
