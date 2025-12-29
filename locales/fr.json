@@ -51,7 +51,7 @@
 
   "location": {
     "title": "## 4.3 Ta localisation *(facultatif)*",
-    "intro": "📍 Pour apparaitre sur la **carte des membres**.\nSaisis ta ville/pays ou `.` pour passer :",
+    "intro": "*(Saisis ta localisation plus ou moins precise, de simple pays a adresse postale complete, ou `.` pour ignorer)*",
     "searching": "Recherche de la localisation...",
     "saved": "Localisation enregistree : **{address}**",
     "map_update": "🗺️ *La carte des membres sera mise a jour dans ~2 minutes.*",

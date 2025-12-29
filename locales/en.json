@@ -51,7 +51,7 @@
 
   "location": {
     "title": "## 4.3 Your location *(optional)*",
-    "intro": "📍 To appear on the **members map**.\nEnter your city/country or `.` to skip:",
+    "intro": "*(Enter your location, from country to full postal address, or `.` to skip)*",
     "searching": "Searching for location...",
     "saved": "Location saved: **{address}**",
     "map_update": "🗺️ *The members map will be updated in ~2 minutes.*",
