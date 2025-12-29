@@ -685,6 +685,9 @@ class SagesCog(commands.Cog):
         # Effectuer la suppression
         results = await UserProfile.delete_all_data(self.bot.db_pool, member.id, username)
 
+        # Regenerer la carte (l'utilisateur n'y apparaitra plus)
+        await regenerate_map_if_needed(self.bot.db_pool)
+
         # Envoyer un DM avant le kick (sauf auto-suppression, il voit deja le message)
         if not is_self:
             try:
