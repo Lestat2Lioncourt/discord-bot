@@ -10,6 +10,7 @@ Commandes:
 - !template: Traite une image OCR
 - !carte: Lien vers la carte des membres
 - !site: Lien vers le site de la team
+- !stats: Statistiques de la communaute
 """
 
 import asyncpg
@@ -214,6 +215,114 @@ class UserCommandsCog(commands.Cog):
             await reply_dm(ctx, f"🌐 **Site This Is PSG** : {SITE_URL}")
         else:
             await reply_dm(ctx, "Le site n'est pas configure. Contactez un administrateur.")
+
+    @commands.command(name="stats", aliases=["statistiques", "dashboard"])
+    async def show_stats(self, ctx):
+        """Affiche les statistiques de la communaute (en DM)."""
+        async with self.bot.db_pool.acquire() as conn:
+            # Stats membres par statut
+            members_stats = await conn.fetchrow("""
+                SELECT
+                    COUNT(*) FILTER (WHERE approval_status != 'deleted') as total,
+                    COUNT(*) FILTER (WHERE approval_status = 'approved') as approved,
+                    COUNT(*) FILTER (WHERE approval_status = 'pending') as pending,
+                    COUNT(*) FILTER (WHERE approval_status = 'refused') as refused
+                FROM user_profile
+            """)
+
+            # Stats joueurs par equipe
+            players_stats = await conn.fetch("""
+                SELECT t.name as team_name, COUNT(p.id) as count
+                FROM teams t
+                LEFT JOIN players p ON t.id = p.team_id
+                GROUP BY t.id, t.name
+                ORDER BY t.id
+            """)
+
+            # Stats carte (membres avec localisation)
+            map_stats = await conn.fetchrow("""
+                SELECT
+                    COUNT(*) FILTER (WHERE latitude IS NOT NULL) as on_map,
+                    COUNT(*) FILTER (WHERE approval_status != 'deleted') as total
+                FROM user_profile
+            """)
+
+            # Top localisations (depuis location_display)
+            locations = await conn.fetch("""
+                SELECT location_display, COUNT(*) as count
+                FROM user_profile
+                WHERE location_display IS NOT NULL
+                  AND location_display != ''
+                  AND approval_status != 'deleted'
+                GROUP BY location_display
+                ORDER BY count DESC
+                LIMIT 5
+            """)
+
+            # Derniere inscription
+            last_reg = await conn.fetchval("""
+                SELECT MAX(created_at) FROM user_profile
+                WHERE approval_status != 'deleted'
+            """)
+
+        # Construire l'embed
+        embed = discord.Embed(
+            title="📊 Statistiques This Is PSG",
+            color=discord.Color.blue()
+        )
+
+        # Membres
+        total = members_stats['total'] or 0
+        approved = members_stats['approved'] or 0
+        pending = members_stats['pending'] or 0
+        embed.add_field(
+            name="👥 Membres",
+            value=f"Total : **{total}**\nValides : {approved}\nEn attente : {pending}",
+            inline=True
+        )
+
+        # Joueurs par equipe
+        players_text = ""
+        for team in players_stats:
+            players_text += f"{team['team_name']} : {team['count']}\n"
+        if not players_text:
+            players_text = "Aucun joueur"
+        embed.add_field(
+            name="🎾 Joueurs",
+            value=players_text.strip(),
+            inline=True
+        )
+
+        # Carte
+        on_map = map_stats['on_map'] or 0
+        map_total = map_stats['total'] or 1
+        pct = int(on_map / map_total * 100) if map_total > 0 else 0
+        embed.add_field(
+            name="🗺️ Carte",
+            value=f"Sur la carte : **{on_map}** ({pct}%)",
+            inline=True
+        )
+
+        # Localisations
+        if locations:
+            loc_text = "\n".join([f"{loc['location_display']} ({loc['count']})" for loc in locations])
+            embed.add_field(
+                name="📍 Localisations",
+                value=loc_text,
+                inline=False
+            )
+
+        # Footer avec derniere inscription
+        if last_reg:
+            from datetime import datetime
+            delta = datetime.now() - last_reg.replace(tzinfo=None)
+            if delta.days > 0:
+                embed.set_footer(text=f"Derniere inscription : il y a {delta.days}j")
+            else:
+                hours = delta.seconds // 3600
+                embed.set_footer(text=f"Derniere inscription : il y a {hours}h")
+
+        await reply_dm(ctx, embed=embed)
 
 
 async def setup(bot):

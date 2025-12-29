@@ -244,6 +244,12 @@ async def custom_help(ctx, command_name: str = None):
             "aliases": "-",
             "sage": True
         },
+        "stats": {
+            "desc_fr": "Affiche les statistiques de la communaute (membres, joueurs, carte).",
+            "desc_en": "Show community statistics (members, players, map).",
+            "usage": "!stats",
+            "aliases": "!statistiques, !dashboard"
+        },
     }
 
     if command_name is None:
