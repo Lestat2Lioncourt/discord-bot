@@ -124,3 +124,37 @@ TIMEOUT_LOCATION_INPUT = int(os.getenv("TIMEOUT_LOCATION_INPUT", "120"))
 TIMEOUT_KEEP_OR_RESET = int(os.getenv("TIMEOUT_KEEP_OR_RESET", "300"))
 TIMEOUT_LANGUAGE_CHANGE = int(os.getenv("TIMEOUT_LANGUAGE_CHANGE", "60"))
 TIMEOUT_GEOCODING = int(os.getenv("TIMEOUT_GEOCODING", "10"))
+
+
+# =============================================================================
+# Validation de la configuration
+# =============================================================================
+def validate_config() -> list[str]:
+    """Vérifie la configuration et retourne la liste des avertissements.
+
+    Returns:
+        Liste des messages d'avertissement (vide si tout est OK)
+    """
+    warnings = []
+
+    # IDs Discord critiques
+    if SERVER_ID == 0:
+        warnings.append("SERVER_ID=0 : certaines fonctionnalités seront désactivées")
+
+    if ROLE_SAGE_ID == 0:
+        warnings.append("ROLE_SAGE_ID=0 : les commandes Sage ne fonctionneront pas")
+
+    if ROLE_MEMBRE_ID == 0:
+        warnings.append("ROLE_MEMBRE_ID=0 : la promotion des membres échouera")
+
+    if ROLE_NEWBIE_ID == 0:
+        warnings.append("ROLE_NEWBIE_ID=0 : l'attribution du rôle initial échouera")
+
+    if CHANNEL_SAGE_ID == 0:
+        warnings.append("CHANNEL_SAGE_ID=0 : les notifications Sages ne fonctionneront pas")
+
+    # GitHub (optionnel mais recommandé)
+    if not GITHUB_TOKEN:
+        warnings.append("GITHUB_TOKEN non configuré : la carte ne sera pas publiée")
+
+    return warnings

@@ -5,10 +5,7 @@ Modèle Player - Représente un joueur in-game lié à un membre Discord.
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional, List
-import sys
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from utils.logger import get_logger
 
 logger = get_logger("models.player")

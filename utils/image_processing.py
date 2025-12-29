@@ -5,11 +5,8 @@ import json
 import re
 import os
 import numpy as np
-import sys
 from pathlib import Path
 
-# Ajouter le dossier parent au path pour importer config
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from config import TEMP_DIR
 from utils.logger import get_logger
 

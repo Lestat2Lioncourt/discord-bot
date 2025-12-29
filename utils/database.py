@@ -1,10 +1,6 @@
 import asyncpg
-import sys
-from pathlib import Path
 from typing import Optional, List, Dict, Any
 
-# Ajouter le dossier parent au path pour importer config
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from utils.logger import get_logger
 
 logger = get_logger("utils.database")

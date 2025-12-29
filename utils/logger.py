@@ -7,8 +7,6 @@ import sys
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
-# Import de la config pour le dossier de logs
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from config import LOGS_DIR
 
 

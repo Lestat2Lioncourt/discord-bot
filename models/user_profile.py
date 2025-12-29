@@ -8,10 +8,7 @@ Le username est stocké mais mis à jour automatiquement s'il change.
 import asyncpg
 from datetime import datetime
 from typing import Optional
-import sys
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from constants import ApprovalStatus
 from utils.logger import get_logger
 from utils.cache import profile_cache, invalidate_profile

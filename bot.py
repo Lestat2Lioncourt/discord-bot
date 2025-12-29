@@ -10,8 +10,8 @@ from config import (
     DB_CONFIG,
     BOT_PREFIX,
     BASE_DIR,
+    validate_config,
 )
-from utils.database import Database
 from utils.logger import get_logger
 from utils.validators import validate_user_id, validate_username
 from utils.debug import debug_only, is_debug_mode
@@ -54,9 +54,8 @@ bot = commands.Bot(
 )
 
 # -------------------------------------------------------------------------------
-# Connecteur à la base de données
+# Note: La connexion DB est stockée dans bot.db_pool (pas de variable globale)
 # -------------------------------------------------------------------------------
-db_pool = None
 
 # ===============================================================================
 # Charge les cogs (modules d'interaction avec le bot)
@@ -96,10 +95,19 @@ async def load_cogs():
 # ===============================================================================
 # Fonction de connexion à PostgreSQL
 # ===============================================================================
-async def connect_to_db():
-    global db_pool
-    db_pool = await asyncpg.create_pool(**DB_CONFIG)
+async def connect_to_db() -> asyncpg.Pool:
+    """Crée et retourne un pool de connexions PostgreSQL."""
+    pool = await asyncpg.create_pool(**DB_CONFIG)
     logger.info("Base de données PostgreSQL connectée")
+    return pool
+
+
+async def close_db_pool():
+    """Ferme proprement le pool de connexions."""
+    if hasattr(bot, 'db_pool') and bot.db_pool:
+        await bot.db_pool.close()
+        bot.db_pool = None
+        logger.info("Pool PostgreSQL fermé")
 
 # ===============================================================================
 # Commande test pour interagir avec la base de données
@@ -120,7 +128,7 @@ async def add_user(ctx, user_id: int, user_name: str):
         return
 
     try:
-        async with db_pool.acquire() as connection:
+        async with bot.db_pool.acquire() as connection:
             await connection.execute(
                 "INSERT INTO users (id, name) VALUES ($1, $2)",
                 user_id, user_name
@@ -309,38 +317,47 @@ async def on_command_error(ctx, error):
 # Démarrage du bot avec reconnexion automatique en cas de plantage
 # ===============================================================================
 async def run_bot():
+    """Boucle principale avec reconnexion automatique."""
     while True:
         try:
-            await connect_to_db()
-            bot.db_pool = db_pool
+            # Fermer l'ancien pool s'il existe (évite les fuites mémoire)
+            await close_db_pool()
+
+            # Créer un nouveau pool et le stocker dans bot
+            bot.db_pool = await connect_to_db()
             await load_cogs()
             await bot.start(TOKEN)
         except discord.ConnectionClosed:
             logger.warning("Connexion perdue. Reconnexion dans 5 secondes...")
             await asyncio.sleep(5)
+        except Exception as e:
+            logger.error(f"Erreur dans run_bot: {e}")
+            await asyncio.sleep(5)
+
 
 @bot.event
 async def on_close():
     """Ferme proprement la connexion PostgreSQL à l'arrêt du bot."""
-    global db_pool
-    if db_pool:
-        await db_pool.close()
-        logger.info("Connexion PostgreSQL fermée proprement")
+    await close_db_pool()
 
 # ===============================================================================
 # Démarrage du bot
 # ===============================================================================
 if __name__ == "__main__":
     async def main():
-        global db_pool
+        # Validation de la configuration au démarrage
+        config_warnings = validate_config()
+        for warning in config_warnings:
+            logger.warning(f"CONFIG: {warning}")
+
         async with bot:
             try:
-                await connect_to_db()
-                bot.db_pool = db_pool
+                # Connexion DB et stockage dans bot.db_pool
+                bot.db_pool = await connect_to_db()
 
                 # Executer les migrations automatiquement
                 try:
-                    executed, total = await run_migrations(db_pool)
+                    executed, total = await run_migrations(bot.db_pool)
                     if executed > 0:
                         logger.info(f"Migrations: {executed}/{total} appliquee(s)")
                 except (asyncpg.PostgresError, OSError) as e:
@@ -349,7 +366,7 @@ if __name__ == "__main__":
 
                 # Corriger les location_display manquants
                 try:
-                    fixed = await fix_missing_location_display(db_pool)
+                    fixed = await fix_missing_location_display(bot.db_pool)
                     if fixed > 0:
                         logger.info(f"Location display: {fixed} profil(s) corrige(s)")
                 except Exception as e:
@@ -365,8 +382,7 @@ if __name__ == "__main__":
             finally:
                 logger.info("Fermeture propre du bot...")
                 await bot.close()
-                if db_pool:
-                    await db_pool.close()
+                await close_db_pool()
                 logger.info("Connexions fermées")
 
     try:
