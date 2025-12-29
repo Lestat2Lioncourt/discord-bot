@@ -36,10 +36,8 @@
   },
 
   "players": {
-    "title": "**4.1 Tes joueurs dans le jeu**",
-    "intro": "Saisis les noms de tes joueurs **tels qu'ils apparaissent dans Tennis Clash**.",
-    "team_main": "▶️ **{team_name}** (equipe principale) :\nEntre le(s) nom(s) separes par des virgules, ou `.` si aucun :",
-    "team_other": "▶️ **{team_name}** :\nEntre le(s) nom(s) separes par des virgules, ou `.` si aucun :",
+    "team_main": "## 4.1 Joueurs dans {team_name}\n*(Separe les noms par `,` ou saisis `.` si aucun)*",
+    "team_other": "## 4.2 Joueurs dans {team_name}\n*(Separe les noms par `,` ou saisis `.` si aucun)*",
     "skipped": "Aucun joueur pour {team_name}.",
     "name_too_short_skip": "Nom trop court ignore : {player_name}",
     "name_too_long_skip": "Nom trop long ignore : {player_name}",
@@ -52,8 +50,8 @@
   },
 
   "location": {
-    "title": "**4.2 Ta localisation** *(facultatif)*",
-    "intro": "📍 Permet de t'afficher sur la **carte des membres**.\n\nTu peux etre plus ou moins precis :\n• Simple : pays ou region (*France*, *Bretagne*)\n• Precis : ville ou adresse (*Paris*, *75001 Paris*)\n\nSaisis ta localisation ou `.` pour passer :",
+    "title": "## 4.3 Ta localisation *(facultatif)*",
+    "intro": "📍 Pour apparaitre sur la **carte des membres**.\nSaisis ta ville/pays ou `.` pour passer :",
     "searching": "Recherche de la localisation...",
     "saved": "Localisation enregistree : **{address}**",
     "map_update": "🗺️ *La carte des membres sera mise a jour dans ~2 minutes.*",

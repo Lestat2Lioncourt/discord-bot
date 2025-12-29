@@ -138,87 +138,26 @@ async def send_charte(cog, member: discord.Member, dm_channel: discord.DMChannel
 async def complete_profile(cog, member: discord.Member, dm_channel: discord.DMChannel, lang: str):
     """Complete le profil (joueurs + localisation).
 
+    Flow simplifie : on demande toujours joueurs et localisation.
+    Les nouvelles saisies remplacent les anciennes (annule et remplace).
+
     Args:
         cog: Instance du RegistrationCog
         member: Membre Discord
         dm_channel: Canal DM
         lang: Code langue (FR/EN)
     """
-    username = member.name
-
+    # Titre principal
     await dm_channel.send(t("profile.title", lang))
     await asyncio.sleep(0.5)
 
-    # Verifier si le membre a deja des infos enregistrees
-    existing_players = await Player.get_by_member(cog.bot.db_pool, username)
-
-    async with cog.bot.db_pool.acquire() as conn:
-        profile = await UserProfile.get_or_create_user(username, conn, member)
-        await profile.load_from_db()
-
-    has_existing_data = existing_players or profile.localisation
-
-    if has_existing_data:
-        # Afficher les infos existantes
-        if lang.upper() == "FR":
-            msg = "**Des informations sont deja enregistrees :**\n"
-        else:
-            msg = "**Some information is already registered:**\n"
-
-        if existing_players:
-            team1 = [p.player_name for p in existing_players if p.team_name == Teams.TEAM1_NAME]
-            team2 = [p.player_name for p in existing_players if p.team_name == Teams.TEAM2_NAME]
-            if team1:
-                msg += f"• {Teams.TEAM1_NAME} : {', '.join(team1)}\n"
-            if team2:
-                msg += f"• {Teams.TEAM2_NAME} : {', '.join(team2)}\n"
-
-        if profile.localisation:
-            msg += f"• 📍 {profile.localisation}\n"
-
-        msg += "\n" + t("profile.keep_or_reset", lang)
-
-        await dm_channel.send(msg)
-
-        view = KeepOrResetView(member, lang)
-        await dm_channel.send(t("profile.choose_option", lang), view=view)
-
-        try:
-            await asyncio.wait_for(view.wait(), timeout=Timeouts.KEEP_OR_RESET)
-        except asyncio.TimeoutError:
-            await dm_channel.send(t("profile.players_kept", lang))
-            view.keep = True
-
-        if view.keep:
-            if existing_players:
-                # A des joueurs -> passer a la localisation (offre de la modifier)
-                await asyncio.sleep(0.5)
-                await ask_location(cog, member, dm_channel, lang)
-                return
-            # Pas de joueurs mais a une localisation -> demander les joueurs
-            # (continue vers la saisie des joueurs ci-dessous)
-        else:
-            # Transaction: Effacer les joueurs et la localisation ensemble
-            async with cog.bot.db_pool.acquire() as conn:
-                async with conn.transaction():
-                    await Player.delete_all_for_member(cog.bot.db_pool, username, conn=conn)
-                    if profile.localisation:
-                        await profile.clear_location(conn=conn)
-            await dm_channel.send(t("profile.players_cleared", lang))
-            await asyncio.sleep(0.5)
-
-    # Joueurs
-    await dm_channel.send(t("players.title", lang))
-    await dm_channel.send(t("players.intro", lang))
-    await asyncio.sleep(0.5)
-
-    # Team 1
+    # 4.1 Team 1
     await ask_players_for_team(cog, member, dm_channel, Teams.TEAM1_ID, Teams.TEAM1_NAME, lang, is_main_team=True)
 
-    # Team 2
+    # 4.2 Team 2
     await ask_players_for_team(cog, member, dm_channel, Teams.TEAM2_ID, Teams.TEAM2_NAME, lang, is_main_team=False)
 
-    # Localisation
+    # 4.3 Localisation
     await asyncio.sleep(0.5)
     await ask_location(cog, member, dm_channel, lang)
 
@@ -341,17 +280,11 @@ async def ask_location(cog, member: discord.Member, dm_channel: discord.DMChanne
         profile = await UserProfile.get_or_create_user(username, conn, member)
         await profile.load_from_db()
 
+    # Titre + instruction
+    msg = t("location.title", lang) + "\n" + t("location.intro", lang)
     if profile.localisation:
-        existing_msg = f"📍 **Localisation actuelle:** {profile.localisation}\n\n"
-        if lang.upper() == "FR":
-            existing_msg += "Tape `.` pour conserver, ou saisis une nouvelle localisation :"
-        else:
-            existing_msg += "Type `.` to keep, or enter a new location:"
-        await dm_channel.send(t("location.title", lang))
-        await dm_channel.send(existing_msg)
-    else:
-        await dm_channel.send(t("location.title", lang))
-        await dm_channel.send(t("location.intro", lang))
+        msg += f"\n\n📍 *Actuel : {profile.localisation}*"
+    await dm_channel.send(msg)
 
     def check(m):
         return m.author == member and isinstance(m.channel, discord.DMChannel)

@@ -36,10 +36,8 @@
   },
 
   "players": {
-    "title": "**4.1 Your in-game players**",
-    "intro": "Enter your player names **as they appear in Tennis Clash**.",
-    "team_main": "▶️ **{team_name}** (main team):\nEnter name(s) separated by commas, or `.` if none:",
-    "team_other": "▶️ **{team_name}**:\nEnter name(s) separated by commas, or `.` if none:",
+    "team_main": "## 4.1 Players in {team_name}\n*(Separate names with `,` or type `.` if none)*",
+    "team_other": "## 4.2 Players in {team_name}\n*(Separate names with `,` or type `.` if none)*",
     "skipped": "No player for {team_name}.",
     "name_too_short_skip": "Name too short, skipped: {player_name}",
     "name_too_long_skip": "Name too long, skipped: {player_name}",
@@ -52,8 +50,8 @@
   },
 
   "location": {
-    "title": "**4.2 Your location** *(optional)*",
-    "intro": "📍 Allows you to appear on the **members map**.\n\nYou can be more or less precise:\n• Simple: country or region (*France*, *Brittany*)\n• Precise: city or address (*Paris*, *75001 Paris*)\n\nEnter your location or `.` to skip:",
+    "title": "## 4.3 Your location *(optional)*",
+    "intro": "📍 To appear on the **members map**.\nEnter your city/country or `.` to skip:",
     "searching": "Searching for location...",
     "saved": "Location saved: **{address}**",
     "map_update": "🗺️ *The members map will be updated in ~2 minutes.*",
