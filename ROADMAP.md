@@ -832,6 +832,46 @@ for member_data in pending:
 
 ---
 
+## 🛡️ PHASE ACTUELLE : Stabilisation (Option A)
+
+> **Objectif** : Consolider le code existant avant d'ajouter de nouvelles fonctionnalités.
+
+### ✅ Accomplissements récents
+
+| Élément | État | Description |
+|---------|------|-------------|
+| `!stats` | ✅ | Commande publique affichant les statistiques communauté |
+| Lazy loading | ✅ | OpenCV/pytesseract chargés à la demande |
+| db_pool | ✅ | Plus de variable globale, fermeture propre |
+| Code orphelin | ✅ | Fichiers inutilisés supprimés |
+| validate_config | ✅ | Avertissements au démarrage si config incomplète |
+
+### 🔧 Maintenance continue
+
+- **Surveillance** : Vérifier les logs en production
+- **Tests** : 196 tests passants (utils, models, schemas)
+- **Documentation** : ROADMAP et ARCHITECTURE à jour
+
+### 📋 Backlog (basse priorité)
+
+| Élément | Effort | Bénéfice |
+|---------|--------|----------|
+| Tests cogs (registration, sages) | Élevé | Couverture +20% |
+| Documentation Tesseract | Faible | Clarté installation |
+| Pre-commit hooks (mypy, ruff) | Moyen | Qualité automatisée |
+| i18n dynamique (DB) | Élevé | Ajout langues simplifié |
+
+### 📊 État du projet
+
+```
+Score santé : 7.4/10
+Tests       : 196 passants
+Couverture  : ~40% (utils/models complets)
+Version     : 1.0.0
+```
+
+---
+
 ## Suivi des modifications
 
 | Date | Modification | Auteur |
@@ -861,4 +901,5 @@ for member_data in pending:
 | 28/12/2024 | Phase 19 : A1 mypy config, A3 metrics (utils/metrics.py, !metrics) | Claude |
 | 29/12/2024 | Cycle 3 : Analyse globale complète, scores, plan d'action Phases 20-23 | Claude |
 | 29/12/2024 | Phases 20-23 : Corrections critiques (db_pool, sys.path, orphelins, lazy loading) | Claude |
+| 29/12/2024 | feat: commande !stats (statistiques communaute) | Claude |
 
