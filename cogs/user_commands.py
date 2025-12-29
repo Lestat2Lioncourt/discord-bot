@@ -259,9 +259,9 @@ class UserCommandsCog(commands.Cog):
                 LIMIT 5
             """)
 
-            # Derniere inscription
-            last_reg = await conn.fetchval("""
-                SELECT MAX(created_at) FROM user_profile
+            # Derniere activite
+            last_activity = await conn.fetchval("""
+                SELECT MAX(last_connection) FROM user_profile
                 WHERE approval_status != 'deleted'
             """)
 
@@ -312,15 +312,15 @@ class UserCommandsCog(commands.Cog):
                 inline=False
             )
 
-        # Footer avec derniere inscription
-        if last_reg:
+        # Footer avec derniere activite
+        if last_activity:
             from datetime import datetime
-            delta = datetime.now() - last_reg.replace(tzinfo=None)
+            delta = datetime.now() - last_activity.replace(tzinfo=None)
             if delta.days > 0:
-                embed.set_footer(text=f"Derniere inscription : il y a {delta.days}j")
+                embed.set_footer(text=f"Derniere activite : il y a {delta.days}j")
             else:
                 hours = delta.seconds // 3600
-                embed.set_footer(text=f"Derniere inscription : il y a {hours}h")
+                embed.set_footer(text=f"Derniere activite : il y a {hours}h")
 
         await reply_dm(ctx, embed=embed)
 
