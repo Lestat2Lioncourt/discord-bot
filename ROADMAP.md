@@ -867,7 +867,7 @@ for member_data in pending:
 Score santé : 7.4/10
 Tests       : 196 passants
 Couverture  : ~40% (utils/models complets)
-Version     : 1.0.0
+Version     : 1.1.0
 ```
 
 ---
