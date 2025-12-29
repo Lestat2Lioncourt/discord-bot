@@ -1,10 +1,13 @@
-import cv2
-import pytesseract
-from PIL import Image
+"""
+Module de traitement d'images pour l'OCR.
+
+Les dépendances lourdes (OpenCV, Pillow, pytesseract) sont chargées
+en lazy loading pour accélérer le démarrage du bot.
+"""
+
 import json
 import re
 import os
-import numpy as np
 from pathlib import Path
 
 from config import TEMP_DIR
@@ -12,8 +15,69 @@ from utils.logger import get_logger
 
 logger = get_logger("utils.image_processing")
 
-def preprocess_image(image: np.ndarray) -> np.ndarray:
-    """Prétraite l'image pour améliorer la reconnaissance de texte."""
+# =============================================================================
+# Lazy loading des dépendances lourdes
+# =============================================================================
+_cv2 = None
+_pytesseract = None
+_np = None
+
+
+def _get_cv2():
+    """Charge OpenCV en lazy loading."""
+    global _cv2
+    if _cv2 is None:
+        try:
+            import cv2
+            _cv2 = cv2
+        except ImportError:
+            raise ImportError(
+                "opencv-python-headless n'est pas installé. "
+                "Installez-le avec: pip install opencv-python-headless"
+            )
+    return _cv2
+
+
+def _get_pytesseract():
+    """Charge pytesseract en lazy loading."""
+    global _pytesseract
+    if _pytesseract is None:
+        try:
+            import pytesseract
+            _pytesseract = pytesseract
+        except ImportError:
+            raise ImportError(
+                "pytesseract n'est pas installé. "
+                "Installez-le avec: pip install pytesseract"
+            )
+    return _pytesseract
+
+
+def _get_numpy():
+    """Charge numpy en lazy loading."""
+    global _np
+    if _np is None:
+        try:
+            import numpy as np
+            _np = np
+        except ImportError:
+            raise ImportError(
+                "numpy n'est pas installé. "
+                "Installez-le avec: pip install numpy"
+            )
+    return _np
+
+def preprocess_image(image):
+    """Prétraite l'image pour améliorer la reconnaissance de texte.
+
+    Args:
+        image: Image numpy array (BGR)
+
+    Returns:
+        Image binaire prétraitée
+    """
+    cv2 = _get_cv2()
+
     try:
         # Log des dimensions de l'image
         logger.debug(f"Dimensions de l'image: {image.shape}")
@@ -21,7 +85,7 @@ def preprocess_image(image: np.ndarray) -> np.ndarray:
         # Convertir en niveaux de gris
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-        # Redimensionner si l'image est trop grand----e
+        # Redimensionner si l'image est trop grande
         height, width = gray.shape
         if height > 1000:
             scale = 1000 / height
@@ -30,7 +94,7 @@ def preprocess_image(image: np.ndarray) -> np.ndarray:
             logger.debug(f"Image redimensionnée à: {gray.shape}")
 
         # Améliorer le contraste
-        clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8,8))
+        clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
         gray = clahe.apply(gray)
 
         # Binarisation adaptative
@@ -49,8 +113,17 @@ def preprocess_image(image: np.ndarray) -> np.ndarray:
         logger.error(f"Erreur lors du prétraitement: {str(e)}")
         raise
 
-def extract_text_with_debug(image: np.ndarray) -> str:
-    """Extrait le texte avec plusieurs tentatives et configurations."""
+def extract_text_with_debug(image) -> str:
+    """Extrait le texte avec plusieurs tentatives et configurations.
+
+    Args:
+        image: Image numpy array prétraitée
+
+    Returns:
+        Texte extrait de l'image
+    """
+    pytesseract = _get_pytesseract()
+
     configs = [
         '--oem 3 --psm 6',  # Configuration par défaut
         '--oem 3 --psm 4',  # Page segmentée comme du texte simple
@@ -79,7 +152,17 @@ def extract_text_with_debug(image: np.ndarray) -> str:
     return best_text
 
 def process_image(image_path: str, del_image: bool = True) -> str:
-    """Traite une image pour en extraire les informations du personnage."""
+    """Traite une image pour en extraire les informations du personnage.
+
+    Args:
+        image_path: Chemin vers l'image à traiter
+        del_image: Si True, supprime l'image après traitement
+
+    Returns:
+        Chemin vers le fichier JSON généré
+    """
+    cv2 = _get_cv2()
+
     try:
         # Vérification du chemin de l'image
         if not os.path.exists(image_path):
