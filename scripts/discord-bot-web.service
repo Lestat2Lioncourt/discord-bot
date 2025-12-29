@@ -1,0 +1,25 @@
+[Unit]
+Description=This Is PSG - Serveur Web Carte
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=detrax
+Group=detrax
+WorkingDirectory=/home/detrax/Projects/discord_bot
+ExecStart=/home/detrax/.local/bin/uv run python -m web.server
+
+# Variables d'environnement
+Environment="WEB_HOST=0.0.0.0"
+Environment="WEB_PORT=8080"
+
+# Redemarrage automatique
+Restart=always
+RestartSec=10
+
+# Logs
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

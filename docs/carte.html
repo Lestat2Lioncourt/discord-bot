@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>This Is PSG - Carte des membres</title>
+
+    <!-- Open Graph meta tags pour apercu Discord -->
+    <meta property="og:title" content="This Is PSG - Carte des membres">
+    <meta property="og:description" content="3 membres localises - Carte de localisation des membres">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content="https://i.imgur.com/YourLogoHere.png">
+    <meta name="theme-color" content="#004170">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        #header {
+            background: linear-gradient(135deg, #004170 0%, #00264d 100%);
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+        #header h1 { font-size: 1.4em; font-weight: 600; }
+        #header .stats { font-size: 0.9em; opacity: 0.9; }
+        #map { height: calc(100vh - 60px); width: 100%; }
+        .member-popup { min-width: 150px; }
+        .member-popup h3 {
+            color: #004170;
+            margin-bottom: 5px;
+            font-size: 1.1em;
+        }
+        .member-popup .location {
+            color: #666;
+            font-size: 0.9em;
+        }
+        .member-popup .players {
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid #eee;
+            font-size: 0.85em;
+        }
+        .member-popup .players strong { color: #004170; }
+        .leaflet-popup-content-wrapper {
+            border-radius: 8px;
+            box-shadow: 0 3px 14px rgba(0,0,0,0.2);
+        }
+    </style>
+</head>
+<body>
+    <div id="header">
+        <h1>This Is PSG - Carte des membres</h1>
+        <div class="stats">3 membres localises | Genere le 29/12/2025 10:31</div>
+    </div>
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
+    <script>
+        // Donnees des membres (injectees par le bot)
+        const members = [{"name": "Lestat", "lat": 48.8534951, "lng": 2.3483915, "team1": ["Aaa"], "team2": ["Bbb"]}, {"name": "DeTraX", "lat": 48.8498487, "lng": 2.3778542, "team1": ["DeTraX"], "team2": ["Lestat"]}, {"name": "Blusky", "lat": 48.8392676, "lng": 2.1575981, "team1": ["Kaioken"], "team2": []}];
+
+        // Initialiser la carte centree sur la France
+        const map = L.map('map').setView([46.603354, 1.888334], 5);
+
+        // Fond de carte OpenStreetMap
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+            maxZoom: 18
+        }).addTo(map);
+
+        // Groupe de clusters pour regrouper les marqueurs proches
+        const markers = L.markerClusterGroup({
+            spiderfyOnMaxZoom: true,
+            showCoverageOnHover: false,
+            maxClusterRadius: 50
+        });
+
+        // Icone personnalisee
+        const memberIcon = L.divIcon({
+            className: 'custom-marker',
+            html: '<div style="background:#004170;width:30px;height:30px;border-radius:50%;border:3px solid white;box-shadow:0 2px 5px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:14px;">&#128100;</div>',
+            iconSize: [30, 30],
+            iconAnchor: [15, 15],
+            popupAnchor: [0, -15]
+        });
+
+        // Ajouter les marqueurs
+        members.forEach(member => {
+            let popupContent = `<div class="member-popup">
+                <h3>${member.name}</h3>`;
+
+            // Joueurs par equipe
+            if (member.team1 && member.team1.length > 0) {
+                popupContent += `<div class="players"><strong>This Is PSG:</strong> ${member.team1.join(', ')}</div>`;
+            }
+            if (member.team2 && member.team2.length > 0) {
+                popupContent += `<div class="players"><strong>This Is PSG 2:</strong> ${member.team2.join(', ')}</div>`;
+            }
+            popupContent += '</div>';
+
+            const marker = L.marker([member.lat, member.lng], { icon: memberIcon })
+                .bindPopup(popupContent);
+
+            // Afficher le popup au survol
+            marker.on('mouseover', function() { this.openPopup(); });
+
+            markers.addLayer(marker);
+        });
+
+        map.addLayer(markers);
+
+        // Ajuster la vue pour voir tous les marqueurs
+        if (members.length > 0) {
+            const group = L.featureGroup(markers.getLayers());
+            map.fitBounds(group.getBounds().pad(0.1));
+        }
+    </script>
+</body>
+</html>

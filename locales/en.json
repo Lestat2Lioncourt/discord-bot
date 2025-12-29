@@ -1,0 +1,153 @@
+{
+  "lang_name": "English",
+  "lang_flag": "🇬🇧",
+
+  "welcome": {
+    "title": "Welcome **{display_name}**!",
+    "intro": "I will guide you through the registration process to join the team.\nAnswer the following questions.\n\n*If a button doesn't respond on first click, just click again.*",
+    "already_registered": "You are already registered and validated!"
+  },
+
+  "language": {
+    "question": "Choisis ta langue / Select your language"
+  },
+
+  "charte": {
+    "intro": "# 1️⃣ Server Rules\n\nBefore continuing, please read the charter carefully.",
+    "instruction": "Open the file, read it entirely, then click the button to accept.",
+    "instruction_url": "📜 **Read the charter here:** {url}\n\nOnce read, click the button below to accept.",
+    "accept_button": "I have read and accept the charter",
+    "refuse_button": "I refuse",
+    "accepted": "Charter accepted!",
+    "refused": "Accepting the charter is **mandatory** to join the team.\nYour registration has been cancelled.\n\nIf you change your mind, type `!inscription` to start again.",
+    "timeout": "Time expired. Type `!inscription` to start again."
+  },
+
+  "profile": {
+    "title": "# 4️⃣ Complete your profile",
+    "existing_players": "**Some information is already registered:**",
+    "keep_or_reset": "Do you want to **keep** this information or **delete all** and start over?",
+    "choose_option": "Choose an option:",
+    "keep_button": "Keep",
+    "reset_button": "Delete all",
+    "players_kept": "Information kept.",
+    "players_deleted": "Deleting...",
+    "players_cleared": "Information deleted. Starting over..."
+  },
+
+  "players": {
+    "title": "**4.1 Your in-game players**",
+    "intro": "Enter your player names **as they appear in Tennis Clash**.",
+    "team_main": "▶️ **{team_name}** (main team):\nEnter name(s) separated by commas, or `.` if none:",
+    "team_other": "▶️ **{team_name}**:\nEnter name(s) separated by commas, or `.` if none:",
+    "skipped": "No player for {team_name}.",
+    "name_too_short_skip": "Name too short, skipped: {player_name}",
+    "name_too_long_skip": "Name too long, skipped: {player_name}",
+    "invalid_name": "Invalid name skipped (forbidden characters): {player_name}",
+    "duplicate_in_input": "Player **{player_name}** entered twice for {team_name}, skipped.",
+    "already_exists": "Member **{member}** already has a player named **{player_name}** in {team_name}.",
+    "error": "Error adding player.",
+    "timeout": "Time expired, moving on...",
+    "count": "✓ {count} player(s) added to {team_name}"
+  },
+
+  "location": {
+    "title": "**4.2 Your location** *(optional)*",
+    "intro": "📍 Allows you to appear on the **members map**.\n\nYou can be more or less precise:\n• Simple: country or region (*France*, *Brittany*)\n• Precise: city or address (*Paris*, *75001 Paris*)\n\nEnter your location or `.` to skip:",
+    "searching": "Searching for location...",
+    "saved": "Location saved: **{address}**",
+    "map_update": "🗺️ *The members map will be updated in ~2 minutes.*",
+    "not_found": "Location not found. You can change it later with `!profil`.",
+    "invalid": "Invalid location (too long or forbidden characters). You can try again later.",
+    "service_error": "Location service unavailable. You can try again later.",
+    "error": "Error during location search. You can try again later.",
+    "skipped": "Location skipped.",
+    "timeout": "Time expired."
+  },
+
+  "finish": {
+    "title": "**Registration complete!**",
+    "your_players": "**Your players:**",
+    "pending": "Your registration is now **pending validation** by a Sage.\nYou will be notified once your application is reviewed.\n\nUse `!profil` to see your information.",
+    "approved": "Congratulations! Your application has been **approved** by {sage_name}.\nYou now have access to all server channels.\n\nWelcome to the team!",
+    "refused": "Your application has been **refused** by a Sage.",
+    "refused_reason": "**Reason:** {reason}",
+    "refused_contact": "If you think this is a mistake, write the reason in this channel.\n**DO NOT WRITE TO THE BOT**, it cannot process that."
+  },
+
+  "errors": {
+    "dm_failed": "I cannot send you a private message. Check your settings.",
+    "sage_only": "This command is reserved for Sages.",
+    "rate_limited": "You are using this command too often. Please wait {seconds} seconds."
+  },
+
+  "commands": {
+    "inscription_public": "I'm sending you the instructions in private message...",
+    "joueur_public": "I'm sending you the form in private message...",
+    "no_players": "No players registered.",
+    "sent_dm": "I sent you the information in private message."
+  },
+
+  "profil_cmd": {
+    "title": "{name}'s Profile",
+    "status": "Status",
+    "language": "Language",
+    "lang_fr": "🇫🇷 Francais",
+    "lang_en": "🇬🇧 English",
+    "players": "Players",
+    "no_players": "No players registered",
+    "location": "Location",
+    "footer": "Use !player / !joueur, !location / !localisation to edit"
+  },
+
+  "help_cmd": {
+    "title": "📚 Available Commands",
+    "subtitle": "Use `!help <command>` for more details.",
+    "general": "🌐 General",
+    "general_list": "`!help` - Show this help\n`!language / !langue` - Change your language (FR/EN)\n`!site` - Link to the team website",
+    "profile": "👤 Registration & Profile",
+    "profile_list": "`!inscription` - Start registration\n`!profil` - Show your profile\n`!player / !joueur` - Manage your players\n`!location / !localisation` - Set your location\n`!users / !membres` - List members\n`!map / !carte` - Interactive members map",
+    "sages": "⚖️ Sages (moderators)",
+    "sages_list": "`!pending / !attente` - Pending registrations\n`!approve / !valider` - Approve a member\n`!refuse / !refuser` - Reject a member\n`!profil-admin @user` - Full profile\n`!reset @user` - Reset a member\n`!delete / !supprimer` - Delete a member (GDPR)\n`!metrics / !stats` - Bot statistics\n`!audit-permissions` - Permissions audit",
+    "footer": "This Is PSG - Tennis Clash Team",
+    "cmd_title": "📖 Command `!{cmd}`",
+    "description": "Description",
+    "usage": "Usage",
+    "aliases": "Aliases",
+    "permission": "⚠️ Permission",
+    "sage_only": "Sages only",
+    "unknown_cmd": "Command `{cmd}` not found. Use `!help` for the list."
+  },
+
+  "langue_cmd": {
+    "set_fr": "Langue definie : 🇫🇷 Francais",
+    "set_en": "Language set: 🇬🇧 English",
+    "timeout": "Temps ecoule / Time expired."
+  },
+
+  "sages_cmd": {
+    "pending_title": "Pending Registrations",
+    "pending_count": "{count} member(s) pending",
+    "pending_none": "No pending registrations.",
+    "pending_footer": "Use !valider @user or !refuser @user [reason]",
+    "pending_players": "Players",
+    "pending_no_players": "None",
+    "already_approved": "{member} is already approved.",
+    "charte_not_validated": "{member} has not validated the charter yet.",
+    "validated_success": "{member} has been validated and promoted to Member by **{sage_name}**!",
+    "validated_error": "Error promoting {member}. Check permissions.",
+    "welcome_public": "🎉 Welcome {member} to the team **{guild}**!\nYour application has been approved. You now have access to all channels.",
+    "already_refused": "{member} is already refused.",
+    "refused_success": "{member} has been refused by **{sage_name}**.",
+    "refused_reason": "Reason: {reason}",
+    "profil_admin_title": "{name}'s Profile",
+    "profil_admin_status": "Status",
+    "profil_admin_roles": "Roles",
+    "profil_admin_no_roles": "None",
+    "profil_admin_players": "Players",
+    "profil_admin_no_players": "None",
+    "profil_admin_location": "Location",
+    "profil_admin_registered": "Registered",
+    "profil_admin_last_seen": "Last seen"
+  }
+}

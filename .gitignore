@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.venv/
+venv/
+.python-version
+
+# Environment & Secrets
+.env
+.env.local
+.env.production
+security/credentials.py
+
+# Temporary files
+temp/
+*.tmp
+
+# Logs
+logs/
+*.log
+
+# IDE
+.vscode/
+.idea/
+.claude/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+nul
+backup/

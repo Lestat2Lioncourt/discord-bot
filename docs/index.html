@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>This Is PSG - Tennis Clash</title>
+
+    <!-- Open Graph meta tags pour apercu Discord -->
+    <meta property="og:title" content="This Is PSG - Tennis Clash">
+    <meta property="og:description" content="Page officielle This Is PSG team on Tennis Clash">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content="https://lestat2lioncourt.github.io/discord-bot/images/Bandeau%20This%20Is%20PSG.png">
+    <meta name="theme-color" content="#004170">
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #001f3f 0%, #004170 50%, #00264d 100%);
+            min-height: 100vh;
+            color: white;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px 20px 10px;
+        }
+
+        .lang-toggle {
+            display: flex;
+            justify-content: flex-end;
+            gap: 5px;
+            margin-bottom: 10px;
+        }
+
+        .lang-btn {
+            padding: 6px 10px;
+            border: none;
+            background: rgba(255, 255, 255, 0.1);
+            cursor: pointer;
+            border-radius: 15px;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+        }
+
+        .lang-btn svg {
+            width: 24px;
+            height: 16px;
+            border-radius: 2px;
+        }
+
+        .lang-btn.active {
+            background: rgba(255, 255, 255, 0.25);
+        }
+
+        .lang-btn:hover:not(.active) {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        header {
+            text-align: center;
+            padding: 0 0 15px;
+        }
+
+        .banner {
+            max-width: 100%;
+            height: auto;
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-top: 10px;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 30px;
+            text-align: center;
+            text-decoration: none;
+            color: white;
+            transition: all 0.3s ease;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            background: rgba(255, 255, 255, 0.15);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .card-icon {
+            font-size: 3em;
+            margin-bottom: 15px;
+        }
+
+        .card h2 {
+            font-size: 1.4em;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .card.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .card.disabled:hover {
+            transform: none;
+            background: rgba(255, 255, 255, 0.1);
+            box-shadow: none;
+        }
+
+        .badge {
+            display: inline-block;
+            background: rgba(255, 193, 7, 0.3);
+            color: #ffc107;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 0.75em;
+            margin-top: 10px;
+            font-weight: 600;
+        }
+
+        footer {
+            text-align: center;
+            padding: 15px 20px;
+            opacity: 0.7;
+            font-size: 0.9em;
+        }
+
+        footer a {
+            color: white;
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="lang-toggle">
+            <button class="lang-btn active" onclick="setLang('fr')" id="btn-fr">
+                <svg viewBox="0 0 30 20"><rect width="10" height="20" fill="#002395"/><rect x="10" width="10" height="20" fill="#fff"/><rect x="20" width="10" height="20" fill="#ED2939"/></svg>
+            </button>
+            <button class="lang-btn" onclick="setLang('en')" id="btn-en">
+                <svg viewBox="0 0 30 20"><rect width="30" height="20" fill="#012169"/><path d="M0,0 L30,20 M30,0 L0,20" stroke="#fff" stroke-width="4"/><path d="M0,0 L30,20 M30,0 L0,20" stroke="#C8102E" stroke-width="2"/><path d="M15,0 V20 M0,10 H30" stroke="#fff" stroke-width="6"/><path d="M15,0 V20 M0,10 H30" stroke="#C8102E" stroke-width="3"/></svg>
+            </button>
+        </div>
+
+        <header>
+            <img src="images/Bandeau%20This%20Is%20PSG.png" alt="This Is PSG" class="banner">
+        </header>
+
+        <div class="cards">
+            <a href="carte.html" class="card">
+                <div class="card-icon">🗺️</div>
+                <h2 data-fr="Carte des membres" data-en="Members map">Carte des membres</h2>
+                <small id="carte-update" style="opacity: 0.6; font-size: 0.8em;"></small>
+            </a>
+
+            <div class="card disabled">
+                <div class="card-icon">📊</div>
+                <h2 data-fr="Statistiques" data-en="Statistics">Statistiques</h2>
+                <span class="badge" data-fr="Bientot disponible" data-en="Coming soon">Bientot disponible</span>
+            </div>
+
+            <a href="charte.html" class="card">
+                <div class="card-icon">📜</div>
+                <h2 data-fr="Notre charte" data-en="Our charter">Notre charte</h2>
+            </a>
+        </div>
+    </div>
+
+    <footer>
+        <p><span data-fr="This Is PSG &copy; 2025 |" data-en="This Is PSG &copy; 2025 |">This Is PSG &copy; 2025 |</span> <a href="https://discord.gg/dEV34pC5um" data-fr="Rejoindre le Discord" data-en="Join Discord">Rejoindre le Discord</a></p>
+    </footer>
+
+    <script>
+        function setLang(lang) {
+            document.getElementById('btn-fr').classList.remove('active');
+            document.getElementById('btn-en').classList.remove('active');
+            document.getElementById('btn-' + lang).classList.add('active');
+
+            document.querySelectorAll('[data-fr][data-en]').forEach(el => {
+                el.innerHTML = el.getAttribute('data-' + lang);
+            });
+
+            localStorage.setItem('site-lang', lang);
+            document.documentElement.lang = lang;
+
+            // Update carte date prefix
+            updateCarteDate(lang);
+        }
+
+        function updateCarteDate(lang) {
+            fetch('carte_meta.json')
+                .then(r => r.json())
+                .then(data => {
+                    const prefix = lang === 'fr' ? 'maj' : 'updated';
+                    document.getElementById('carte-update').textContent = `(${prefix} ${data.last_update})`;
+                })
+                .catch(() => {});
+        }
+
+        // Load saved language preference and carte date
+        const savedLang = localStorage.getItem('site-lang') || 'fr';
+        if (savedLang !== 'fr') {
+            setLang(savedLang);
+        } else {
+            updateCarteDate('fr');
+        }
+    </script>
+</body>
+</html>

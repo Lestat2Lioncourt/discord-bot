@@ -1,0 +1,153 @@
+{
+  "lang_name": "Français",
+  "lang_flag": "🇫🇷",
+
+  "welcome": {
+    "title": "Bienvenue **{display_name}** !",
+    "intro": "Je vais te guider dans ton inscription pour rejoindre la team.\nReponds aux questions suivantes.\n\n*Si un bouton ne reagit pas au premier clic, reclique dessus.*",
+    "already_registered": "Tu es deja inscrit et valide !"
+  },
+
+  "language": {
+    "question": "Choisis ta langue / Select your language"
+  },
+
+  "charte": {
+    "intro": "# 1️⃣ La Charte du serveur\n\nAvant de continuer, lis attentivement la charte.",
+    "instruction": "Ouvre le fichier, lis-le entierement, puis clique sur le bouton pour accepter.",
+    "instruction_url": "📜 **Lis la charte ici :** {url}\n\nUne fois lue, clique sur le bouton ci-dessous pour accepter.",
+    "accept_button": "J'ai lu et j'accepte la charte",
+    "refuse_button": "Je refuse",
+    "accepted": "Charte acceptee !",
+    "refused": "L'acceptation de la charte est **obligatoire** pour rejoindre la team.\nTon inscription est annulee.\n\nSi tu changes d'avis, tape `!inscription` pour recommencer.",
+    "timeout": "Temps ecoule. Tape `!inscription` pour recommencer."
+  },
+
+  "profile": {
+    "title": "# 4️⃣ Complete ton profil",
+    "existing_players": "**Des informations sont deja enregistrees :**",
+    "keep_or_reset": "Veux-tu **conserver** ces informations ou **tout effacer** et recommencer ?",
+    "choose_option": "Choisis une option :",
+    "keep_button": "Conserver",
+    "reset_button": "Tout effacer",
+    "players_kept": "Informations conservees.",
+    "players_deleted": "Effacement en cours...",
+    "players_cleared": "Informations effacees. On recommence..."
+  },
+
+  "players": {
+    "title": "**4.1 Tes joueurs dans le jeu**",
+    "intro": "Saisis les noms de tes joueurs **tels qu'ils apparaissent dans Tennis Clash**.",
+    "team_main": "▶️ **{team_name}** (equipe principale) :\nEntre le(s) nom(s) separes par des virgules, ou `.` si aucun :",
+    "team_other": "▶️ **{team_name}** :\nEntre le(s) nom(s) separes par des virgules, ou `.` si aucun :",
+    "skipped": "Aucun joueur pour {team_name}.",
+    "name_too_short_skip": "Nom trop court ignore : {player_name}",
+    "name_too_long_skip": "Nom trop long ignore : {player_name}",
+    "invalid_name": "Nom invalide ignore (caracteres non autorises) : {player_name}",
+    "duplicate_in_input": "Joueur **{player_name}** saisi en double pour {team_name}, ignore.",
+    "already_exists": "Le membre **{member}** a deja un joueur nomme **{player_name}** dans {team_name}.",
+    "error": "Erreur lors de l'ajout.",
+    "timeout": "Temps ecoule, on continue...",
+    "count": "✓ {count} joueur(s) ajoute(s) dans {team_name}"
+  },
+
+  "location": {
+    "title": "**4.2 Ta localisation** *(facultatif)*",
+    "intro": "📍 Permet de t'afficher sur la **carte des membres**.\n\nTu peux etre plus ou moins precis :\n• Simple : pays ou region (*France*, *Bretagne*)\n• Precis : ville ou adresse (*Paris*, *75001 Paris*)\n\nSaisis ta localisation ou `.` pour passer :",
+    "searching": "Recherche de la localisation...",
+    "saved": "Localisation enregistree : **{address}**",
+    "map_update": "🗺️ *La carte des membres sera mise a jour dans ~2 minutes.*",
+    "not_found": "Localisation non trouvee. Tu pourras la modifier plus tard avec `!profil`.",
+    "invalid": "Localisation invalide (trop longue ou caracteres non autorises). Tu pourras reessayer plus tard.",
+    "service_error": "Service de localisation indisponible. Tu pourras reessayer plus tard.",
+    "error": "Erreur lors de la localisation. Tu pourras reessayer plus tard.",
+    "skipped": "Localisation ignoree.",
+    "timeout": "Temps ecoule."
+  },
+
+  "finish": {
+    "title": "**Inscription terminee !**",
+    "your_players": "**Tes joueurs :**",
+    "pending": "Ton inscription est maintenant **en attente de validation** par un Sage.\nTu seras notifie des que ta candidature sera examinee.\n\nUtilise `!profil` pour voir tes informations.",
+    "approved": "Felicitations ! Ta candidature a ete **validee** par {sage_name}.\nTu as maintenant acces a tous les salons du serveur.\n\nBienvenue dans la team !",
+    "refused": "Ta candidature a ete **refusee** par un Sage.",
+    "refused_reason": "**Raison:** {reason}",
+    "refused_contact": "Si tu penses que c'est une erreur, ecris la raison dans ce salon.\n**N'ECRIS PAS AU BOT**, il ne saurait pas traiter."
+  },
+
+  "errors": {
+    "dm_failed": "Je ne peux pas t'envoyer de message prive. Verifie tes parametres.",
+    "sage_only": "Cette commande est reservee aux Sages.",
+    "rate_limited": "Tu utilises cette commande trop souvent. Reessaie dans {seconds} secondes."
+  },
+
+  "commands": {
+    "inscription_public": "Je t'envoie les instructions en message prive...",
+    "joueur_public": "Je t'envoie le formulaire d'ajout en message prive...",
+    "no_players": "Aucun joueur enregistre.",
+    "sent_dm": "Je t'ai envoye les informations en message prive."
+  },
+
+  "profil_cmd": {
+    "title": "Profil de {name}",
+    "status": "Statut",
+    "language": "Langue",
+    "lang_fr": "🇫🇷 Francais",
+    "lang_en": "🇬🇧 English",
+    "players": "Joueurs",
+    "no_players": "Aucun joueur enregistre",
+    "location": "Localisation",
+    "footer": "Utilise !joueur / !player, !localisation / !location pour modifier"
+  },
+
+  "help_cmd": {
+    "title": "📚 Commandes disponibles",
+    "subtitle": "Utilise `!help <commande>` pour plus de details.",
+    "general": "🌐 General",
+    "general_list": "`!help` - Affiche cette aide\n`!langue / !language` - Change ta langue (FR/EN)\n`!site` - Lien vers le site de la team",
+    "profile": "👤 Inscription & Profil",
+    "profile_list": "`!inscription` - Demarre l'inscription\n`!profil` - Affiche ton profil\n`!joueur / !player` - Gere tes joueurs\n`!localisation / !location` - Definit ta position\n`!users / !membres` - Liste des membres\n`!carte / !map` - Carte interactive des membres",
+    "sages": "⚖️ Sages (moderateurs)",
+    "sages_list": "`!pending / !attente` - Inscriptions en attente\n`!valider / !approve` - Valide un membre\n`!refuser / !refuse` - Refuse un membre\n`!profil-admin @user` - Profil complet\n`!reset @user` - Reinitialise un membre\n`!delete / !supprimer` - Supprime un membre (RGPD)\n`!metrics / !stats` - Statistiques du bot\n`!audit-permissions` - Audit des droits",
+    "footer": "This Is PSG - Tennis Clash Team",
+    "cmd_title": "📖 Commande `!{cmd}`",
+    "description": "Description",
+    "usage": "Usage",
+    "aliases": "Aliases",
+    "permission": "⚠️ Permission",
+    "sage_only": "Reservee aux Sages",
+    "unknown_cmd": "Commande `{cmd}` non reconnue. Utilise `!help` pour la liste."
+  },
+
+  "langue_cmd": {
+    "set_fr": "Langue definie : 🇫🇷 Francais",
+    "set_en": "Language set: 🇬🇧 English",
+    "timeout": "Temps ecoule / Time expired."
+  },
+
+  "sages_cmd": {
+    "pending_title": "Inscriptions en attente",
+    "pending_count": "{count} membre(s) en attente",
+    "pending_none": "Aucune inscription en attente.",
+    "pending_footer": "Utilise !valider @user ou !refuser @user [raison]",
+    "pending_players": "Joueurs",
+    "pending_no_players": "Aucun",
+    "already_approved": "{member} est deja approuve.",
+    "charte_not_validated": "{member} n'a pas encore valide la charte.",
+    "validated_success": "{member} a ete valide et promu Membre par **{sage_name}** !",
+    "validated_error": "Erreur lors de la promotion de {member}. Verifie les permissions.",
+    "welcome_public": "🎉 Bienvenue {member} dans la team **{guild}** !\nTa candidature a ete validee. Tu as maintenant acces a tous les salons.",
+    "already_refused": "{member} est deja refuse.",
+    "refused_success": "{member} a ete refuse par **{sage_name}**.",
+    "refused_reason": "Raison: {reason}",
+    "profil_admin_title": "Profil de {name}",
+    "profil_admin_status": "Statut",
+    "profil_admin_roles": "Roles",
+    "profil_admin_no_roles": "Aucun",
+    "profil_admin_players": "Joueurs",
+    "profil_admin_no_players": "Aucun",
+    "profil_admin_location": "Localisation",
+    "profil_admin_registered": "Inscription",
+    "profil_admin_last_seen": "Derniere connexion"
+  }
+}

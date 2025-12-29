@@ -1,0 +1,3 @@
+# Fichiers generes - toujours prendre la version distante en cas de conflit
+docs/carte.html merge=ours
+docs/carte_meta.json merge=ours
