@@ -36,8 +36,8 @@
   },
 
   "players": {
-    "team_main": "## 4.1 Joueurs dans {team_name}\n*(Separe les noms par `,` ou saisis `.` si aucun)*",
-    "team_other": "## 4.2 Joueurs dans {team_name}\n*(Separe les noms par `,` ou saisis `.` si aucun)*",
+    "team_main": "## 4.1 Joueurs dans la Team 1\n*(Separe les noms par `,` ou saisis `.` si aucun)*",
+    "team_other": "## 4.2 Joueurs dans la Team 2\n*(Separe les noms par `,` ou saisis `.` si aucun)*",
     "skipped": "Aucun joueur pour {team_name}.",
     "name_too_short_skip": "Nom trop court ignore : {player_name}",
     "name_too_long_skip": "Nom trop long ignore : {player_name}",
