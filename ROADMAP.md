@@ -832,22 +832,22 @@ for member_data in pending:
 
 ---
 
-## 🔄 CYCLE 4 - Analyse globale (06/01/2026)
+## 🔄 CYCLE 4 - Analyse globale (06/01/2026) ✅ COMPLET
 
 ### Scores d'évaluation
 
-| Aspect | Score | Évolution | Commentaire |
-|--------|-------|-----------|-------------|
-| **Structure** | 8/10 | = | Architecture modulaire claire (cogs/models/utils) |
-| **Qualité du code** | 7/10 | ↓0.5 | Fonctions trop longues, code orphelin détecté |
-| **Sécurité** | 7/10 | = | SQL safe mais mauvaises pratiques (f-strings) |
-| **Maintenabilité** | 7/10 | = | sages.py trop volumineux (1068 lignes) |
-| **Fiabilité** | 6/10 | ↓1 | Race conditions, blocking sleep, pool non sync |
-| **Performance** | 7/10 | = | Cache inefficace O(n log n), requêtes multiples |
-| **Tests** | 6/10 | +1 | 196 tests (utils/models), cogs non testés |
-| **Documentation** | 8/10 | = | ARCHITECTURE.md, docstrings, ROADMAP complet |
+| Aspect | Avant | Après | Évolution | Commentaire |
+|--------|-------|-------|-----------|-------------|
+| **Structure** | 8/10 | **9/10** | ↑1 | ✅ sages.py modularisé, 2 packages (registration, sages) |
+| **Qualité du code** | 7/10 | **8/10** | ↑1 | ✅ Code orphelin supprimé, SQL propre |
+| **Sécurité** | 7/10 | **8/10** | ↑1 | ✅ SQL avec placeholders, thread-safe |
+| **Maintenabilité** | 7/10 | **8/10** | ↑1 | ✅ Fichiers < 700 lignes, modules spécialisés |
+| **Fiabilité** | 6/10 | **8/10** | ↑2 | ✅ Async geocode, code mort supprimé |
+| **Performance** | 7/10 | **8/10** | ↑1 | ✅ Cache O(1), requêtes consolidées |
+| **Tests** | 6/10 | 6/10 | = | 196 tests (utils/models), cogs non testés |
+| **Documentation** | 8/10 | 8/10 | = | ARCHITECTURE.md, docstrings, ROADMAP complet |
 
-**Score global : 7.0/10** (↓0.4 depuis Cycle 3)
+**Score global : 7.0/10 → 7.9/10** (↑0.9)
 
 ---
 
@@ -866,34 +866,36 @@ for member_data in pending:
 
 ---
 
-### Points Faibles (-)
+### Points Faibles (-) → TOUS RÉSOLUS ✅
 
-1. **Blocking sleep** : `time.sleep()` dans `retry.py:63` gèle l'event loop
-2. **Code orphelin** : `self.db = Database()` instancié mais jamais utilisé (3 cogs)
-3. **Fonction `run_bot()` orpheline** : Jamais appelée dans `bot.py:325`
-4. **Listener vide** : `on_member_update()` ne fait rien d'utile
-5. **sages.py monolithique** : 1068 lignes, fonctions de 100+ lignes
-6. **Cache O(n log n)** : Tri complet à chaque insertion
-7. **Requêtes multiples** : 5 SELECT séparés dans `!stats`
-8. **SQL f-strings** : Mauvaise pratique même si safe actuellement
+| # | Problème | Résolution |
+|---|----------|------------|
+| 1 | ~~Blocking sleep~~ | ✅ `geocode()` async avec `asyncio.to_thread()` |
+| 2 | ~~Code orphelin `self.db`~~ | ✅ Supprimé de 3 cogs |
+| 3 | ~~Fonction `run_bot()` orpheline~~ | ✅ Supprimée |
+| 4 | ~~Listener `on_member_update()` vide~~ | ✅ Supprimé |
+| 5 | ~~sages.py monolithique (1271 lignes)~~ | ✅ Package 4 modules |
+| 6 | ~~Cache O(n log n)~~ | ✅ OrderedDict FIFO O(1) |
+| 7 | ~~5 requêtes dans !stats~~ | ✅ Consolidé en 3 requêtes |
+| 8 | ~~SQL f-strings~~ | ✅ Placeholders $1, $2 |
 
 ---
 
-### Risques Identifiés
+### Risques Identifiés → TOUS RÉSOLUS ✅
 
-| ID | Sévérité | Description | Fichier(s) | Ligne(s) |
-|----|----------|-------------|------------|----------|
-| R1 | 🔴 CRITIQUE | `time.sleep()` bloque tout l'event loop | `utils/retry.py` | 63 |
-| R2 | 🔴 CRITIQUE | Race condition pool DB à la reconnexion | `bot.py` | 337-341 |
-| R3 | 🟠 ÉLEVÉ | `self.db = Database()` jamais utilisé | `events.py`, `user_commands.py`, `registration/__init__.py` | 40, 35, 36 |
-| R4 | 🟠 ÉLEVÉ | `run_bot()` fonction orpheline | `bot.py` | 325-341 |
-| R5 | 🟠 ÉLEVÉ | Lazy loading thread-unsafe | `utils/image_processing.py` | 21-38 |
-| R6 | 🟡 MOYEN | `on_member_update()` listener inutile | `cogs/events.py` | 153-155 |
-| R7 | 🟡 MOYEN | 5 requêtes séparées dans `!stats` | `cogs/user_commands.py` | 219-260 |
-| R8 | 🟡 MOYEN | Cache éviction O(n log n) | `utils/cache.py` | 58-69 |
-| R9 | 🟡 MOYEN | SQL avec f-strings (mauvaise pratique) | `models/user_profile.py` | 386, 399, 412 |
-| R10 | 🟢 BAS | Imports inutilisés (logging, Path) | `bot.py` | 3-4 |
-| R11 | 🟢 BAS | sages.py trop volumineux | `cogs/sages.py` | 1068 lignes |
+| ID | Sévérité | Description | Statut |
+|----|----------|-------------|--------|
+| R1 | 🔴 CRITIQUE | `time.sleep()` bloque l'event loop | ✅ Phase 24 |
+| R2 | 🔴 CRITIQUE | `run_bot()` fonction orpheline | ✅ Phase 24 |
+| R3 | 🟠 ÉLEVÉ | `self.db = Database()` jamais utilisé | ✅ Phase 25 |
+| R4 | 🟠 ÉLEVÉ | (fusionné avec R2) | ✅ Phase 24 |
+| R5 | 🟠 ÉLEVÉ | Lazy loading thread-unsafe | ✅ Phase 26 |
+| R6 | 🟡 MOYEN | `on_member_update()` listener vide | ✅ Phase 25 |
+| R7 | 🟡 MOYEN | 5 requêtes séparées dans `!stats` | ✅ Phase 26 |
+| R8 | 🟡 MOYEN | Cache éviction O(n log n) | ✅ Phase 26 |
+| R9 | 🟡 MOYEN | SQL avec f-strings | ✅ Phase 26 |
+| R10 | 🟢 BAS | Imports inutilisés | ✅ Phase 25 |
+| R11 | 🟢 BAS | sages.py trop volumineux (1271 lignes) | ✅ Phase 27 |
 
 ---
 
@@ -971,15 +973,23 @@ for member_data in pending:
 
 ---
 
-### 📊 État du projet
+### 📊 Bilan Cycle 4
 
 ```
-Score santé : 7.5/10
+Score santé : 7.0/10 → 7.9/10 (↑0.9)
 Tests       : 196 passants
 Couverture  : ~40% (utils/models complets)
 Version     : 1.1.0
-Phases      : 24-27 terminées (Cycle 4 complet)
+Risques     : 11/11 résolus (100%)
+Phases      : 24-27 terminées
 ```
+
+**Résumé des améliorations :**
+- 2 risques critiques éliminés (blocking sleep, code orphelin)
+- 3 risques élevés corrigés (thread-safety, code mort)
+- 4 risques moyens optimisés (cache, SQL, requêtes)
+- 2 risques bas nettoyés (imports, modularisation)
+- sages.py : 1271 lignes → 4 modules (~600 + 50 + 180 + 160)
 
 ---
 
