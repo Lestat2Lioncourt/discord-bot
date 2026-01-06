@@ -943,13 +943,18 @@ for member_data in pending:
   **Fichier :** `models/user_profile.py`
   **Impact :** Meilleure pratique sécurité
 
-#### Phase 27 - Refactoring (optionnel) 🟢
+#### Phase 27 - Refactoring 🟢 ✅ TERMINÉE
 **Priorité : BASSE**
 
-- [ ] **R11** : Découper `sages.py` en sous-modules
-  - `sages/validation.py` : _validate_member, _refuse_member
-  - `sages/commands.py` : commandes !valider, !refuser, etc.
-  - `sages/notifications.py` : notify_sages_*
+- [x] **R11** : Découper `sages.py` en sous-modules ✅
+  ```
+  cogs/sages/
+  ├── __init__.py      # SagesCog principal (~600 lignes)
+  ├── helpers.py       # check_is_sage(), sage_only() (~50 lignes)
+  ├── views.py         # 3 classes View (~180 lignes)
+  └── notifications.py # notify_sages_* (~160 lignes)
+  ```
+  **Impact :** Fichier monolithique (1271 lignes) → 4 modules spécialisés
 
 ---
 
@@ -969,11 +974,11 @@ for member_data in pending:
 ### 📊 État du projet
 
 ```
-Score santé : 7.5/10 (↑0.5)
+Score santé : 7.5/10
 Tests       : 196 passants
 Couverture  : ~40% (utils/models complets)
 Version     : 1.1.0
-Phases      : 24-26 terminées
+Phases      : 24-27 terminées (Cycle 4 complet)
 ```
 
 ---
@@ -1014,4 +1019,5 @@ Phases      : 24-26 terminées
 | 06/01/2026 | Phase 24 : R1 geocode async, R2 run_bot supprimé | Claude |
 | 06/01/2026 | Phase 25 : R3 Database inutilisé, R6 listener vide, R10 import | Claude |
 | 06/01/2026 | Phase 26 : R5 thread-safe, R7 stats consolidé, R8 cache O(1), R9 SQL | Claude |
+| 06/01/2026 | Phase 27 : R11 sages.py → package (4 modules, ~1000 lignes réparties) | Claude |
 
