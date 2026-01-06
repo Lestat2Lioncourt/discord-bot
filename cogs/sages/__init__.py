@@ -5,15 +5,20 @@ Commandes:
 - !pending : Liste les inscriptions en attente
 - !valider <nom> : Valide un membre (Newbie -> Membre)
 - !refuser <nom> [raison] : Refuse un membre
+- !check_users : Envoie les notifications pour les membres en attente
+- !profil-admin <nom> : Affiche le profil complet d'un membre
+- !reset <nom> : Reinitialise un membre (debug)
+- !sudo : Active/desactive les droits Sage temporaires (debug)
+- !delete <nom> : Supprime completement un utilisateur (RGPD)
+- !audit-permissions : Exporte les permissions par role
+- !metrics : Affiche les metriques du bot
 """
 
 import asyncpg
 import asyncio
 import discord
 from discord.ext import commands
-from discord import ButtonStyle, Interaction
-from discord.ui import Button, View
-from typing import Optional
+from discord import Interaction
 
 from models.user_profile import UserProfile
 from models.player import Player
@@ -21,57 +26,27 @@ from utils.logger import get_logger
 from utils.roles import is_sage, promote_to_membre, demote_to_newbie
 from utils.i18n import t
 from utils.map_generator import regenerate_map_if_needed
-from config import CHANNEL_GENERAL_ID, CHANNEL_SAGE_ID, DEBUG_MODE, DEBUG_USER, ROLE_SAGE_ID, SERVER_ID
+from config import CHANNEL_GENERAL_ID, DEBUG_MODE
 from constants import Teams, ApprovalStatus
-from utils.discord_helpers import find_member, find_member_strict
-from utils.debug import debug_only, is_sudo, toggle_sudo
+from utils.discord_helpers import find_member_strict
+from utils.debug import debug_only, toggle_sudo
 from utils.audit import log_action, AuditAction
 from utils.metrics import metrics
 
+from .helpers import check_is_sage, sage_only
+from .views import DeleteConfirmView, DeleteSageConfirmView, ValidationView
+from .notifications import notify_sages_new_registration, notify_sages_returning_member
+
 logger = get_logger("cogs.sages")
 
-
-def check_is_sage(user, bot) -> bool:
-    """
-    Verifie si un utilisateur est Sage.
-
-    Fonctionne en contexte serveur (Member avec roles) et en DM (User sans roles).
-    En DM, utilise SERVER_ID pour trouver le membre directement.
-    En mode DEBUG, les utilisateurs avec sudo sont aussi consideres Sage.
-
-    Args:
-        user: L'utilisateur (Member ou User)
-        bot: Instance du bot
-
-    Returns:
-        True si l'utilisateur est Sage, False sinon
-    """
-    # Mode sudo (debug uniquement)
-    if is_sudo(user.id):
-        return True
-
-    if hasattr(user, 'roles') and user.roles:
-        # Contexte serveur : user est un Member avec roles
-        return is_sage(user)
-
-    # Contexte DM ou cache vide : chercher dans le serveur principal
-    if SERVER_ID:
-        guild = bot.get_guild(SERVER_ID)
-        if guild:
-            member = guild.get_member(user.id)
-            if member:
-                return is_sage(member)
-    return False
-
-
-def sage_only():
-    """Decorateur pour limiter une commande aux Sages."""
-    async def predicate(ctx):
-        if not check_is_sage(ctx.author, ctx.bot):
-            await ctx.send(t("errors.sage_only", "FR"))
-            return False
-        return True
-    return commands.check(predicate)
+# Re-export pour compatibilite
+__all__ = [
+    'SagesCog',
+    'check_is_sage',
+    'sage_only',
+    'notify_sages_new_registration',
+    'notify_sages_returning_member',
+]
 
 
 class SagesCog(commands.Cog):
@@ -180,7 +155,7 @@ class SagesCog(commands.Cog):
                 await ctx_or_interaction.send(msg)
 
         async with self.bot.db_pool.acquire() as conn:
-            # Transaction pour éviter les race conditions
+            # Transaction pour eviter les race conditions
             async with conn.transaction():
                 profile = await UserProfile.get_or_create_user(username, conn, member)
                 member_lang = profile.language or "FR"
@@ -278,7 +253,7 @@ class SagesCog(commands.Cog):
                 await ctx_or_interaction.send(msg)
 
         async with self.bot.db_pool.acquire() as conn:
-            # Transaction pour éviter les race conditions
+            # Transaction pour eviter les race conditions
             async with conn.transaction():
                 profile = await UserProfile.get_or_create_user(username, conn, member)
                 member_lang = profile.language or "FR"
@@ -581,11 +556,11 @@ class SagesCog(commands.Cog):
             # Retrograder en Newbie si necessaire
             await demote_to_newbie(member)
 
-        msg = f"✅ **{member.display_name}** reinitialise :\n"
-        msg += f"• Statut : pending\n"
-        msg += f"• Charte : non validee\n"
-        msg += f"• Joueurs supprimes : {deleted_count}\n"
-        msg += f"• Role : Newbie\n"
+        msg = f"**{member.display_name}** reinitialise :\n"
+        msg += f"* Statut : pending\n"
+        msg += f"* Charte : non validee\n"
+        msg += f"* Joueurs supprimes : {deleted_count}\n"
+        msg += f"* Role : Newbie\n"
         msg += f"\nLe membre peut relancer `!inscription`."
 
         await ctx.send(msg)
@@ -617,9 +592,9 @@ class SagesCog(commands.Cog):
 
         enabled = toggle_sudo(ctx.author.id)
         if enabled:
-            await ctx.send(f"🔓 **Sudo activé** pour {ctx.author.display_name}\nTu as maintenant les droits Sage.")
+            await ctx.send(f"**Sudo active** pour {ctx.author.display_name}\nTu as maintenant les droits Sage.")
         else:
-            await ctx.send(f"🔒 **Sudo désactivé** pour {ctx.author.display_name}")
+            await ctx.send(f"**Sudo desactive** pour {ctx.author.display_name}")
 
     # =========================================================================
     # Commande !delete (suppression complete RGPD)
@@ -643,7 +618,7 @@ class SagesCog(commands.Cog):
 
         # Verifier les permissions
         if not is_self and not is_sage_user:
-            await ctx.send("❌ Tu ne peux supprimer que ton propre profil.")
+            await ctx.send("Tu ne peux supprimer que ton propre profil.")
             return
 
         # Charger le profil pour verifier qu'il existe
@@ -660,12 +635,12 @@ class SagesCog(commands.Cog):
         if is_self:
             # Auto-suppression: confirmation simple
             warning = (
-                f"⚠️ **ATTENTION - SUPPRESSION DEFINITIVE** ⚠️\n\n"
+                f"**ATTENTION - SUPPRESSION DEFINITIVE**\n\n"
                 f"Tu es sur le point de supprimer **TOUTES** tes donnees:\n"
-                f"• Profil utilisateur\n"
-                f"• {len(players)} joueur(s)\n"
-                f"• Historique des pseudos\n"
-                f"• Logs d'audit\n\n"
+                f"* Profil utilisateur\n"
+                f"* {len(players)} joueur(s)\n"
+                f"* Historique des pseudos\n"
+                f"* Logs d'audit\n\n"
                 f"**Cette action est IRREVERSIBLE !**\n"
                 f"**Tu seras deconnecte du serveur a l'issue de la suppression.**\n"
                 f"Tu pourras revenir a tout moment via le lien d'invitation."
@@ -675,16 +650,16 @@ class SagesCog(commands.Cog):
         else:
             # Suppression par un Sage: double validation requise
             warning = (
-                f"⚠️ **ATTENTION - SUPPRESSION DEFINITIVE** ⚠️\n\n"
+                f"**ATTENTION - SUPPRESSION DEFINITIVE**\n\n"
                 f"**{ctx.author.display_name}** demande la suppression de **{member.display_name}** (@{username}).\n\n"
                 f"Donnees a supprimer:\n"
-                f"• Profil utilisateur\n"
-                f"• {len(players)} joueur(s)\n"
-                f"• Historique des pseudos\n"
-                f"• Logs d'audit\n\n"
+                f"* Profil utilisateur\n"
+                f"* {len(players)} joueur(s)\n"
+                f"* Historique des pseudos\n"
+                f"* Logs d'audit\n\n"
                 f"**Cette action est IRREVERSIBLE !**\n"
                 f"Le membre sera deconnecte du serveur.\n\n"
-                f"🛡️ **Un autre Sage doit confirmer cette suppression.**"
+                f"**Un autre Sage doit confirmer cette suppression.**"
             )
             view = DeleteSageConfirmView(member, ctx.author)
             timeout = 300  # 5 minutes
@@ -694,11 +669,11 @@ class SagesCog(commands.Cog):
         try:
             await asyncio.wait_for(view.wait(), timeout=timeout)
         except asyncio.TimeoutError:
-            await confirm_msg.edit(content="❌ Temps ecoule. Suppression annulee.", view=None)
+            await confirm_msg.edit(content="Temps ecoule. Suppression annulee.", view=None)
             return
 
         if not view.confirmed:
-            await confirm_msg.edit(content="❌ Suppression annulee.", view=None)
+            await confirm_msg.edit(content="Suppression annulee.", view=None)
             return
 
         # Recuperer le nom du Sage confirmant (si double validation)
@@ -716,7 +691,7 @@ class SagesCog(commands.Cog):
         if not is_self:
             try:
                 dm_msg = (
-                    f"👋 **Tes donnees ont ete supprimees du serveur {ctx.guild.name}.**\n\n"
+                    f"**Tes donnees ont ete supprimees du serveur {ctx.guild.name}.**\n\n"
                     f"Tu vas etre deconnecte du serveur.\n"
                     f"Si tu le souhaites, tu peux revenir a tout moment en utilisant le lien d'invitation."
                 )
@@ -737,7 +712,7 @@ class SagesCog(commands.Cog):
             await member.kick(reason=reason)
             kick_msg = "\n\n*Deconnecte du serveur.*"
         except (discord.Forbidden, discord.HTTPException) as e:
-            kick_msg = f"\n\n⚠️ *Impossible de deconnecter: {e}*"
+            kick_msg = f"\n\n*Impossible de deconnecter: {e}*"
 
         # Message de confirmation
         if confirming_sage_name:
@@ -746,11 +721,11 @@ class SagesCog(commands.Cog):
             validation_info = ""
 
         msg = (
-            f"✅ **Donnees supprimees pour {member.display_name}** :\n"
-            f"• Profil : {results['user_profile']}\n"
-            f"• Joueurs : {results['players']}\n"
-            f"• Historique pseudos : {results['username_history']}\n"
-            f"• Logs audit : {results['audit_log']}"
+            f"**Donnees supprimees pour {member.display_name}** :\n"
+            f"* Profil : {results['user_profile']}\n"
+            f"* Joueurs : {results['players']}\n"
+            f"* Historique pseudos : {results['username_history']}\n"
+            f"* Logs audit : {results['audit_log']}"
             f"{kick_msg}"
             f"{validation_info}"
         )
@@ -870,7 +845,7 @@ class SagesCog(commands.Cog):
         summary = metrics.get_summary()
 
         embed = discord.Embed(
-            title="📊 Metriques du Bot",
+            title="Metriques du Bot",
             color=discord.Color.blue()
         )
 
@@ -879,7 +854,7 @@ class SagesCog(commands.Cog):
         hours = int(uptime_s // 3600)
         minutes = int((uptime_s % 3600) // 60)
         embed.add_field(
-            name="⏱️ Uptime",
+            name="Uptime",
             value=f"{hours}h {minutes}m",
             inline=True
         )
@@ -887,14 +862,14 @@ class SagesCog(commands.Cog):
         # Commandes
         cmd = summary["commands"]
         embed.add_field(
-            name="📝 Commandes",
+            name="Commandes",
             value=f"Total: {cmd['total']}\nSucces: {cmd['success']}\nErreurs: {cmd['error']}",
             inline=True
         )
 
         # Temps de reponse
         embed.add_field(
-            name="⚡ Temps moyen",
+            name="Temps moyen",
             value=f"{summary['response_time_avg_ms']:.0f} ms",
             inline=True
         )
@@ -902,7 +877,7 @@ class SagesCog(commands.Cog):
         # Cache
         cache = summary["cache"]
         embed.add_field(
-            name="💾 Cache",
+            name="Cache",
             value=f"Hits: {cache['hits']}\nMisses: {cache['misses']}\nTaux: {cache['hit_rate_percent']:.0f}%",
             inline=True
         )
@@ -910,7 +885,7 @@ class SagesCog(commands.Cog):
         # DB
         db = summary["db"]
         embed.add_field(
-            name="🗄️ Base de donnees",
+            name="Base de donnees",
             value=f"Requetes: {db['queries']}\nErreurs: {db['errors']}",
             inline=True
         )
@@ -920,349 +895,12 @@ class SagesCog(commands.Cog):
             top_cmds = sorted(cmd["by_name"].items(), key=lambda x: x[1], reverse=True)[:5]
             top_str = "\n".join([f"!{name}: {count}" for name, count in top_cmds])
             embed.add_field(
-                name="🏆 Top commandes",
+                name="Top commandes",
                 value=top_str or "Aucune",
                 inline=False
             )
 
         await ctx.send(embed=embed)
-
-
-class DeleteConfirmView(View):
-    """Vue de confirmation pour l'auto-suppression d'un utilisateur."""
-
-    def __init__(self, target: discord.Member, author: discord.Member):
-        super().__init__(timeout=30)
-        self.target = target
-        self.author = author
-        self.confirmed = False
-
-    @discord.ui.button(label="❌ Annuler", style=discord.ButtonStyle.secondary)
-    async def cancel_btn(self, interaction: Interaction, button: discord.ui.Button):
-        if interaction.user.id != self.author.id:
-            await interaction.response.send_message("Ce n'est pas ta demande.", ephemeral=True)
-            return
-        await interaction.response.defer()
-        self.confirmed = False
-        self.stop()
-
-    @discord.ui.button(label="🗑️ SUPPRIMER DEFINITIVEMENT", style=discord.ButtonStyle.danger)
-    async def confirm_btn(self, interaction: Interaction, button: discord.ui.Button):
-        if interaction.user.id != self.author.id:
-            await interaction.response.send_message("Ce n'est pas ta demande.", ephemeral=True)
-            return
-        await interaction.response.defer()
-        self.confirmed = True
-        self.stop()
-
-
-class DeleteSageConfirmView(View):
-    """Vue de confirmation avec double validation Sage (anti-abus)."""
-
-    def __init__(self, target: discord.Member, requesting_sage: discord.Member):
-        super().__init__(timeout=300)  # 5 minutes pour laisser le temps a un autre Sage
-        self.target = target
-        self.requesting_sage = requesting_sage
-        self.confirmed = False
-        self.confirming_sage = None
-
-    @discord.ui.button(label="❌ Annuler", style=discord.ButtonStyle.secondary)
-    async def cancel_btn(self, interaction: Interaction, button: discord.ui.Button):
-        # Seul le Sage demandeur peut annuler
-        if interaction.user.id != self.requesting_sage.id:
-            await interaction.response.send_message(
-                "Seul le Sage ayant initie la demande peut annuler.", ephemeral=True
-            )
-            return
-        await interaction.response.defer()
-        self.confirmed = False
-        self.stop()
-
-    @discord.ui.button(label="✅ Confirmer (autre Sage)", style=discord.ButtonStyle.danger)
-    async def confirm_btn(self, interaction: Interaction, button: discord.ui.Button):
-        # Verifier que c'est un Sage different
-        if interaction.user.id == self.requesting_sage.id:
-            await interaction.response.send_message(
-                "⚠️ Tu ne peux pas valider ta propre demande de suppression.\n"
-                "Un **autre Sage** doit confirmer.", ephemeral=True
-            )
-            return
-
-        # Verifier que c'est bien un Sage
-        if not is_sage(interaction.user):
-            await interaction.response.send_message(
-                "Seuls les Sages peuvent confirmer une suppression.", ephemeral=True
-            )
-            return
-
-        await interaction.response.defer()
-        self.confirmed = True
-        self.confirming_sage = interaction.user
-        self.stop()
-
-
-class ValidationView(View):
-    """Vue avec boutons Valider/Refuser pour les notifications aux Sages."""
-
-    def __init__(self, bot, member_id: int, username: str):
-        super().__init__(timeout=None)  # Pas de timeout pour les boutons persistants
-        self.bot = bot
-        self.member_id = member_id
-        self.username = username
-
-    def _get_member(self) -> Optional[discord.Member]:
-        """Retrouve le membre Discord par son ID."""
-        for guild in self.bot.guilds:
-            member = guild.get_member(self.member_id)
-            if member:
-                return member
-        return None
-
-    def _get_sage_member(self, user: discord.User) -> Optional[discord.Member]:
-        """Retrouve le membre Sage dans une guilde."""
-        for guild in self.bot.guilds:
-            member = guild.get_member(user.id)
-            if member and is_sage(member):
-                return member
-        return None
-
-    @discord.ui.button(label="Valider", style=ButtonStyle.success, emoji="✅")
-    async def validate_btn(self, interaction: Interaction, button: Button):
-        try:
-            logger.info(f"Bouton Valider clique par {interaction.user.name} pour {self.username}")
-
-            # Repondre immediatement pour eviter le timeout de 3s
-            await interaction.response.defer()
-
-            # Verifier que c'est un Sage (en DM, interaction.user est un User, pas un Member)
-            sage_member = self._get_sage_member(interaction.user)
-            if not sage_member:
-                await interaction.followup.send("Seuls les Sages peuvent valider.", ephemeral=True)
-                return
-
-            member = self._get_member()
-            if not member:
-                await interaction.followup.send(f"Membre {self.username} non trouve sur le serveur.", ephemeral=True)
-                return
-
-            logger.debug(f"Membre trouve: {member.name} dans {member.guild.name}")
-
-            # Desactiver les boutons
-            self.validate_btn.disabled = True
-            self.refuse_btn.disabled = True
-            await interaction.edit_original_response(view=self)
-
-            # Recuperer le cog pour utiliser _validate_member
-            cog = self.bot.get_cog("SagesCog")
-            if cog:
-                await cog._do_validate(interaction, member)
-            else:
-                logger.error("SagesCog non trouve!")
-                await interaction.followup.send("Erreur interne: cog non trouve.", ephemeral=True)
-
-        except discord.HTTPException as e:
-            logger.error(f"Erreur bouton Valider: {e}", exc_info=True)
-            try:
-                await interaction.followup.send(f"Erreur: {e}", ephemeral=True)
-            except discord.HTTPException as followup_error:
-                logger.debug(f"Impossible d'envoyer le message d'erreur: {followup_error}")
-
-    @discord.ui.button(label="Refuser", style=ButtonStyle.danger, emoji="❌")
-    async def refuse_btn(self, interaction: Interaction, button: Button):
-        try:
-            logger.info(f"Bouton Refuser clique par {interaction.user.name} pour {self.username}")
-
-            # Repondre immediatement pour eviter le timeout de 3s
-            await interaction.response.defer()
-
-            # Verifier que c'est un Sage (en DM, interaction.user est un User, pas un Member)
-            sage_member = self._get_sage_member(interaction.user)
-            if not sage_member:
-                await interaction.followup.send("Seuls les Sages peuvent refuser.", ephemeral=True)
-                return
-
-            member = self._get_member()
-            if not member:
-                await interaction.followup.send(f"Membre {self.username} non trouve sur le serveur.", ephemeral=True)
-                return
-
-            logger.debug(f"Membre trouve: {member.name} dans {member.guild.name}")
-
-            # Desactiver les boutons
-            self.validate_btn.disabled = True
-            self.refuse_btn.disabled = True
-            await interaction.edit_original_response(view=self)
-
-            # Recuperer le cog pour utiliser _refuse_member
-            cog = self.bot.get_cog("SagesCog")
-            if cog:
-                await cog._do_refuse(interaction, member)
-            else:
-                logger.error("SagesCog non trouve!")
-                await interaction.followup.send("Erreur interne: cog non trouve.", ephemeral=True)
-
-        except discord.HTTPException as e:
-            logger.error(f"Erreur bouton Refuser: {e}", exc_info=True)
-            try:
-                await interaction.followup.send(f"Erreur: {e}", ephemeral=True)
-            except discord.HTTPException as followup_error:
-                logger.debug(f"Impossible d'envoyer le message d'erreur: {followup_error}")
-
-
-async def notify_sages_new_registration(bot, member: discord.Member, profile, players: list):
-    """Envoie une notification aux Sages quand un membre termine son inscription."""
-    logger.debug(f"notify_sages_new_registration appelé pour {member.name} (DEBUG_MODE={DEBUG_MODE})")
-
-    # Construire l'embed
-    embed = discord.Embed(
-        title="📋 Nouvelle inscription",
-        description=f"**{member.display_name}** (@{member.name}) a termine son inscription.",
-        color=discord.Color.orange()
-    )
-
-    # Statut charte
-    charte_status = "✅ Validée" if profile.charte_validated else "❌ Non validée"
-    embed.add_field(name="Charte", value=charte_status, inline=True)
-
-    # Joueurs
-    if players:
-        team1 = [p.player_name for p in players if p.team_name == Teams.TEAM1_NAME]
-        team2 = [p.player_name for p in players if p.team_name == Teams.TEAM2_NAME]
-        if team1:
-            embed.add_field(name=Teams.TEAM1_NAME, value=", ".join(team1), inline=True)
-        if team2:
-            embed.add_field(name=Teams.TEAM2_NAME, value=", ".join(team2), inline=True)
-    else:
-        embed.add_field(name="Joueurs", value="Aucun", inline=False)
-
-    # Localisation (affiche pays/region uniquement, pas l'adresse complete)
-    if profile.localisation:
-        location_display = profile.location_display or profile.localisation
-        embed.add_field(name="Localisation", value=location_display, inline=False)
-
-    # Creer la vue avec boutons
-    view = ValidationView(bot, member.id, member.name)
-
-    # Determiner ou envoyer
-    if DEBUG_MODE:
-        # En mode debug, envoyer en DM a DEBUG_USER
-        for guild in bot.guilds:
-            debug_member = discord.utils.find(
-                lambda m: m.name.lower() == DEBUG_USER.lower(),
-                guild.members
-            )
-            if debug_member:
-                try:
-                    await debug_member.send(embed=embed, view=view)
-                    logger.info(f"Notification inscription envoyee a {DEBUG_USER} (debug)")
-                except discord.Forbidden:
-                    logger.warning(f"Impossible d'envoyer DM a {DEBUG_USER}")
-                return
-    else:
-        # En mode normal, envoyer dans le salon des Sages
-        for guild in bot.guilds:
-            sage_channel = guild.get_channel(CHANNEL_SAGE_ID)
-            if sage_channel:
-                await sage_channel.send(embed=embed, view=view)
-                logger.info(f"Notification inscription envoyee dans le salon des Sages")
-                return
-
-        logger.warning("Salon des Sages non trouve")
-
-
-async def notify_sages_returning_member(bot, member: discord.Member, returning_info: dict):
-    """
-    Alerte les Sages quand un 'revenant' est detecte.
-
-    Un revenant est un membre qui revient avec un nouveau username Discord.
-    Ne notifie que si le username a change.
-    """
-    old_username = returning_info['old_username']
-    logger.info(f"Revenant detecte: {member.name} (ancien: {old_username})")
-
-    # Couleur selon le statut precedent
-    previous_status = returning_info['previous_status']
-    if previous_status == 'refused':
-        color = discord.Color.red()
-        status_emoji = "🚫"
-        status_text = "REFUSE precedemment"
-    elif previous_status == 'deleted':
-        color = discord.Color.orange()
-        status_emoji = "🔄"
-        status_text = "Ancien membre SUPPRIME"
-    elif previous_status == 'approved':
-        color = discord.Color.green()
-        status_emoji = "✅"
-        status_text = "Ancien membre approuve"
-    else:
-        color = discord.Color.orange()
-        status_emoji = "⚠️"
-        status_text = "Etait en attente"
-
-    # Format demande: "inscription de NouveauNom, precedemment inscrit sous le nom AncienNom"
-    embed = discord.Embed(
-        title=f"{status_emoji} Revenant detecte!",
-        description=f"Inscription de **{member.name}**, precedemment inscrit sous le nom **{old_username}**",
-        color=color
-    )
-
-    embed.add_field(
-        name="Nouveau username",
-        value=f"`{member.name}`",
-        inline=True
-    )
-
-    embed.add_field(
-        name="Ancien username",
-        value=f"`{old_username}`",
-        inline=True
-    )
-
-    if returning_info['old_discord_name']:
-        embed.add_field(
-            name="Ancien pseudo",
-            value=returning_info['old_discord_name'],
-            inline=True
-        )
-
-    embed.add_field(
-        name="Statut precedent",
-        value=status_text,
-        inline=True
-    )
-
-    if returning_info['last_seen']:
-        embed.add_field(
-            name="Derniere activite",
-            value=returning_info['last_seen'].strftime("%d/%m/%Y"),
-            inline=True
-        )
-
-    embed.set_footer(text="Verifiez l'historique avant de valider")
-
-    # Envoyer la notification (meme logique que pour les inscriptions)
-    if DEBUG_MODE:
-        for guild in bot.guilds:
-            debug_member = discord.utils.find(
-                lambda m: m.name.lower() == DEBUG_USER.lower(),
-                guild.members
-            )
-            if debug_member:
-                try:
-                    await debug_member.send(embed=embed)
-                    logger.info(f"Alerte revenant envoyee a {DEBUG_USER} (debug)")
-                except discord.Forbidden:
-                    logger.warning(f"Impossible d'envoyer DM a {DEBUG_USER}")
-                return
-    else:
-        for guild in bot.guilds:
-            sage_channel = guild.get_channel(CHANNEL_SAGE_ID)
-            if sage_channel:
-                await sage_channel.send(embed=embed)
-                logger.info("Alerte revenant envoyee dans le salon des Sages")
-                return
-
-        logger.warning("Salon des Sages non trouve pour alerte revenant")
 
 
 async def setup(bot):
