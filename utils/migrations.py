@@ -135,7 +135,7 @@ async def fix_missing_location_display(pool: asyncpg.Pool) -> int:
         fixed = 0
         for row in rows:
             try:
-                result = geocode(row["localisation"])
+                result = await geocode(row["localisation"])
                 if result and result.location_display:
                     await conn.execute("""
                         UPDATE user_profile

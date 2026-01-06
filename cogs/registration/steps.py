@@ -334,7 +334,7 @@ async def save_location(cog, member: discord.Member, dm_channel: discord.DMChann
 
     await dm_channel.send(t("location.searching", lang))
 
-    result = geocode(location)
+    result = await geocode(location)
 
     if result:
         async with cog.bot.db_pool.acquire() as conn:

@@ -8,6 +8,7 @@ Wrapper autour de geopy.Nominatim avec:
 - Extraction automatique du pays/region
 """
 
+import asyncio
 from dataclasses import dataclass
 from typing import Optional
 from functools import lru_cache
@@ -98,9 +99,12 @@ def _geocode_api_call(location: str):
     )
 
 
-def geocode(location: str) -> Optional[GeoResult]:
+async def geocode(location: str) -> Optional[GeoResult]:
     """
-    Geocode une adresse avec cache et retry.
+    Geocode une adresse avec cache et retry (async).
+
+    Utilise asyncio.to_thread() pour ne pas bloquer l'event loop
+    pendant l'appel reseau a Nominatim.
 
     Args:
         location: Adresse ou lieu a geocoder
@@ -108,13 +112,15 @@ def geocode(location: str) -> Optional[GeoResult]:
     Returns:
         GeoResult ou None si non trouve
     """
-    # Verifier le cache d'abord
+    # Verifier le cache d'abord (sync, rapide)
     cached = _get_from_cache(location)
     if cached is not None:
         return cached
 
     try:
-        loc = _geocode_api_call(location)
+        # Executer l'appel bloquant dans un thread separe
+        # Le retry avec time.sleep() ne bloque plus l'event loop
+        loc = await asyncio.to_thread(_geocode_api_call, location)
 
         if loc:
             address_data = loc.raw.get('address', {})

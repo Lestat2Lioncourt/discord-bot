@@ -832,39 +832,141 @@ for member_data in pending:
 
 ---
 
-## 🛡️ PHASE ACTUELLE : Stabilisation (Option A)
+## 🔄 CYCLE 4 - Analyse globale (06/01/2026)
 
-> **Objectif** : Consolider le code existant avant d'ajouter de nouvelles fonctionnalités.
+### Scores d'évaluation
 
-### ✅ Accomplissements récents
+| Aspect | Score | Évolution | Commentaire |
+|--------|-------|-----------|-------------|
+| **Structure** | 8/10 | = | Architecture modulaire claire (cogs/models/utils) |
+| **Qualité du code** | 7/10 | ↓0.5 | Fonctions trop longues, code orphelin détecté |
+| **Sécurité** | 7/10 | = | SQL safe mais mauvaises pratiques (f-strings) |
+| **Maintenabilité** | 7/10 | = | sages.py trop volumineux (1068 lignes) |
+| **Fiabilité** | 6/10 | ↓1 | Race conditions, blocking sleep, pool non sync |
+| **Performance** | 7/10 | = | Cache inefficace O(n log n), requêtes multiples |
+| **Tests** | 6/10 | +1 | 196 tests (utils/models), cogs non testés |
+| **Documentation** | 8/10 | = | ARCHITECTURE.md, docstrings, ROADMAP complet |
 
-| Élément | État | Description |
-|---------|------|-------------|
-| `!stats` | ✅ | Commande publique affichant les statistiques communauté |
-| Lazy loading | ✅ | OpenCV/pytesseract chargés à la demande |
-| db_pool | ✅ | Plus de variable globale, fermeture propre |
-| Code orphelin | ✅ | Fichiers inutilisés supprimés |
-| validate_config | ✅ | Avertissements au démarrage si config incomplète |
+**Score global : 7.0/10** (↓0.4 depuis Cycle 3)
 
-### 🔧 Maintenance continue
+---
 
-- **Surveillance** : Vérifier les logs en production
-- **Tests** : 196 tests passants (utils, models, schemas)
-- **Documentation** : ROADMAP et ARCHITECTURE à jour
+### Points Forts (+)
 
-### 📋 Backlog (basse priorité)
+1. **Architecture modulaire** : Séparation claire cogs/models/utils
+2. **Tests unitaires** : 196 tests passants
+3. **Validation Pydantic** : Schemas pour joueurs et localisation
+4. **Logging structuré** : Logger avec rotation
+5. **Cache et rate limiting** : TTLCache, @rate_limit
+6. **Transactions DB** : Operations critiques protégées
+7. **Migrations automatiques** : Tracking schema_migrations
+8. **Audit logging** : Actions Sages tracées
+9. **Publication carte** : API GitHub (plus de git local)
+10. **Commande !sudo** : Debug Sage temporaire
 
-| Élément | Effort | Bénéfice |
-|---------|--------|----------|
-| Tests cogs (registration, sages) | Élevé | Couverture +20% |
-| Documentation Tesseract | Faible | Clarté installation |
-| Pre-commit hooks (mypy, ruff) | Moyen | Qualité automatisée |
-| i18n dynamique (DB) | Élevé | Ajout langues simplifié |
+---
+
+### Points Faibles (-)
+
+1. **Blocking sleep** : `time.sleep()` dans `retry.py:63` gèle l'event loop
+2. **Code orphelin** : `self.db = Database()` instancié mais jamais utilisé (3 cogs)
+3. **Fonction `run_bot()` orpheline** : Jamais appelée dans `bot.py:325`
+4. **Listener vide** : `on_member_update()` ne fait rien d'utile
+5. **sages.py monolithique** : 1068 lignes, fonctions de 100+ lignes
+6. **Cache O(n log n)** : Tri complet à chaque insertion
+7. **Requêtes multiples** : 5 SELECT séparés dans `!stats`
+8. **SQL f-strings** : Mauvaise pratique même si safe actuellement
+
+---
+
+### Risques Identifiés
+
+| ID | Sévérité | Description | Fichier(s) | Ligne(s) |
+|----|----------|-------------|------------|----------|
+| R1 | 🔴 CRITIQUE | `time.sleep()` bloque tout l'event loop | `utils/retry.py` | 63 |
+| R2 | 🔴 CRITIQUE | Race condition pool DB à la reconnexion | `bot.py` | 337-341 |
+| R3 | 🟠 ÉLEVÉ | `self.db = Database()` jamais utilisé | `events.py`, `user_commands.py`, `registration/__init__.py` | 40, 35, 36 |
+| R4 | 🟠 ÉLEVÉ | `run_bot()` fonction orpheline | `bot.py` | 325-341 |
+| R5 | 🟠 ÉLEVÉ | Lazy loading thread-unsafe | `utils/image_processing.py` | 21-38 |
+| R6 | 🟡 MOYEN | `on_member_update()` listener inutile | `cogs/events.py` | 153-155 |
+| R7 | 🟡 MOYEN | 5 requêtes séparées dans `!stats` | `cogs/user_commands.py` | 219-260 |
+| R8 | 🟡 MOYEN | Cache éviction O(n log n) | `utils/cache.py` | 58-69 |
+| R9 | 🟡 MOYEN | SQL avec f-strings (mauvaise pratique) | `models/user_profile.py` | 386, 399, 412 |
+| R10 | 🟢 BAS | Imports inutilisés (logging, Path) | `bot.py` | 3-4 |
+| R11 | 🟢 BAS | sages.py trop volumineux | `cogs/sages.py` | 1068 lignes |
+
+---
+
+### Plan d'Action Cycle 4
+
+#### Phase 24 - Corrections Critiques 🔴
+**Priorité : IMMÉDIATE**
+
+- [ ] **R1** : Remplacer `time.sleep()` par `await asyncio.sleep()`
+  **Fichier :** `utils/retry.py:63`
+  **Impact :** Bot gelé 1-4s à chaque retry
+
+- [ ] **R2** : Synchroniser fermeture/création du pool DB
+  **Fichier :** `bot.py:337-341`
+  **Impact :** Connexions orphelines, deadlocks possibles
+
+#### Phase 25 - Nettoyage Code Orphelin 🟠
+**Priorité : HAUTE**
+
+- [ ] **R3** : Supprimer `self.db = Database()` inutilisé
+  **Fichiers :** `cogs/events.py:40`, `cogs/user_commands.py:35`, `cogs/registration/__init__.py:36`
+
+- [ ] **R4** : Supprimer ou intégrer `run_bot()`
+  **Fichier :** `bot.py:325-341`
+
+- [ ] **R6** : Supprimer `on_member_update()` vide ou l'implémenter
+  **Fichier :** `cogs/events.py:153-155`
+
+- [ ] **R10** : Supprimer imports inutilisés
+  **Fichier :** `bot.py:3-4`
+
+#### Phase 26 - Optimisations 🟡
+**Priorité : NORMALE**
+
+- [ ] **R5** : Thread-safe lazy loading avec `threading.Lock`
+  **Fichier :** `utils/image_processing.py:21-38`
+
+- [ ] **R7** : Consolider requêtes `!stats` en une seule
+  **Fichier :** `cogs/user_commands.py:219-260`
+
+- [ ] **R8** : Utiliser `collections.OrderedDict` ou LRU natif
+  **Fichier :** `utils/cache.py:58-69`
+
+- [ ] **R9** : Remplacer f-strings SQL par placeholders
+  **Fichier :** `models/user_profile.py:386,399,412`
+
+#### Phase 27 - Refactoring (optionnel) 🟢
+**Priorité : BASSE**
+
+- [ ] **R11** : Découper `sages.py` en sous-modules
+  - `sages/validation.py` : _validate_member, _refuse_member
+  - `sages/commands.py` : commandes !valider, !refuser, etc.
+  - `sages/notifications.py` : notify_sages_*
+
+---
+
+### Estimation d'effort
+
+| Phase | Effort | Risque si non fait |
+|-------|--------|-------------------|
+| Phase 24 | 1h | Bot instable, freezes |
+| Phase 25 | 30min | Code mort, confusion |
+| Phase 26 | 2-3h | Performance dégradée |
+| Phase 27 | 4-6h | Dette technique |
+
+**Total estimé : 8-10h de travail**
+
+---
 
 ### 📊 État du projet
 
 ```
-Score santé : 7.4/10
+Score santé : 7.0/10
 Tests       : 196 passants
 Couverture  : ~40% (utils/models complets)
 Version     : 1.1.0
@@ -902,4 +1004,7 @@ Version     : 1.1.0
 | 29/12/2024 | Cycle 3 : Analyse globale complète, scores, plan d'action Phases 20-23 | Claude |
 | 29/12/2024 | Phases 20-23 : Corrections critiques (db_pool, sys.path, orphelins, lazy loading) | Claude |
 | 29/12/2024 | feat: commande !stats (statistiques communaute) | Claude |
+| 06/01/2026 | fix: conflit alias stats, @sage_only sur !reset | Claude |
+| 06/01/2026 | feat: commande !sudo (debug Sage temporaire) | Claude |
+| 06/01/2026 | Cycle 4 : Analyse globale, 11 risques identifiés, plan Phases 24-27 | Claude |
 

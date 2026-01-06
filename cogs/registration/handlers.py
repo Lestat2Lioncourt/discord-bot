@@ -188,7 +188,7 @@ class RegistrationCommands:
         from utils.geocoding import geocode
 
         username = ctx.author.name
-        result = geocode(location)
+        result = await geocode(location)
 
         if result:
             async with self.bot.db_pool.acquire() as conn:

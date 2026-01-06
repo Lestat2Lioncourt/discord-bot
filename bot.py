@@ -319,28 +319,6 @@ async def on_command_error(ctx, error):
     else:
         logger.error(f"Erreur commande {ctx.command}: {error}")
 
-# ===============================================================================
-# Démarrage du bot avec reconnexion automatique en cas de plantage
-# ===============================================================================
-async def run_bot():
-    """Boucle principale avec reconnexion automatique."""
-    while True:
-        try:
-            # Fermer l'ancien pool s'il existe (évite les fuites mémoire)
-            await close_db_pool()
-
-            # Créer un nouveau pool et le stocker dans bot
-            bot.db_pool = await connect_to_db()
-            await load_cogs()
-            await bot.start(TOKEN)
-        except discord.ConnectionClosed:
-            logger.warning("Connexion perdue. Reconnexion dans 5 secondes...")
-            await asyncio.sleep(5)
-        except Exception as e:
-            logger.error(f"Erreur dans run_bot: {e}")
-            await asyncio.sleep(5)
-
-
 @bot.event
 async def on_close():
     """Ferme proprement la connexion PostgreSQL à l'arrêt du bot."""
