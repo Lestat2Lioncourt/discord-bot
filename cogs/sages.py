@@ -839,7 +839,7 @@ class SagesCog(commands.Cog):
     # =========================================================================
     # Commande !metrics
     # =========================================================================
-    @commands.command(name="metrics", aliases=["stats", "status"])
+    @commands.command(name="metrics", aliases=["status"])
     @sage_only()
     async def cmd_metrics(self, ctx):
         """Affiche les metriques du bot."""
