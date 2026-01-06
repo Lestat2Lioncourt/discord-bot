@@ -3,11 +3,13 @@ Module de traitement d'images pour l'OCR.
 
 Les dépendances lourdes (OpenCV, Pillow, pytesseract) sont chargées
 en lazy loading pour accélérer le démarrage du bot.
+Thread-safe grâce à un Lock.
 """
 
 import json
 import re
 import os
+import threading
 from pathlib import Path
 
 from config import TEMP_DIR
@@ -16,55 +18,62 @@ from utils.logger import get_logger
 logger = get_logger("utils.image_processing")
 
 # =============================================================================
-# Lazy loading des dépendances lourdes
+# Lazy loading des dépendances lourdes (thread-safe)
 # =============================================================================
 _cv2 = None
 _pytesseract = None
 _np = None
+_import_lock = threading.Lock()
 
 
 def _get_cv2():
-    """Charge OpenCV en lazy loading."""
+    """Charge OpenCV en lazy loading (thread-safe)."""
     global _cv2
     if _cv2 is None:
-        try:
-            import cv2
-            _cv2 = cv2
-        except ImportError:
-            raise ImportError(
-                "opencv-python-headless n'est pas installé. "
-                "Installez-le avec: pip install opencv-python-headless"
-            )
+        with _import_lock:
+            if _cv2 is None:  # Double-check après acquisition du lock
+                try:
+                    import cv2
+                    _cv2 = cv2
+                except ImportError:
+                    raise ImportError(
+                        "opencv-python-headless n'est pas installé. "
+                        "Installez-le avec: pip install opencv-python-headless"
+                    )
     return _cv2
 
 
 def _get_pytesseract():
-    """Charge pytesseract en lazy loading."""
+    """Charge pytesseract en lazy loading (thread-safe)."""
     global _pytesseract
     if _pytesseract is None:
-        try:
-            import pytesseract
-            _pytesseract = pytesseract
-        except ImportError:
-            raise ImportError(
-                "pytesseract n'est pas installé. "
-                "Installez-le avec: pip install pytesseract"
-            )
+        with _import_lock:
+            if _pytesseract is None:  # Double-check après acquisition du lock
+                try:
+                    import pytesseract
+                    _pytesseract = pytesseract
+                except ImportError:
+                    raise ImportError(
+                        "pytesseract n'est pas installé. "
+                        "Installez-le avec: pip install pytesseract"
+                    )
     return _pytesseract
 
 
 def _get_numpy():
-    """Charge numpy en lazy loading."""
+    """Charge numpy en lazy loading (thread-safe)."""
     global _np
     if _np is None:
-        try:
-            import numpy as np
-            _np = np
-        except ImportError:
-            raise ImportError(
-                "numpy n'est pas installé. "
-                "Installez-le avec: pip install numpy"
-            )
+        with _import_lock:
+            if _np is None:  # Double-check après acquisition du lock
+                try:
+                    import numpy as np
+                    _np = np
+                except ImportError:
+                    raise ImportError(
+                        "numpy n'est pas installé. "
+                        "Installez-le avec: pip install numpy"
+                    )
     return _np
 
 def preprocess_image(image):

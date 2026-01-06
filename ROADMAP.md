@@ -924,20 +924,24 @@ for member_data in pending:
 - [x] **R10** : Supprimé import `Path` inutilisé ✅
   **Fichier :** `bot.py`
 
-#### Phase 26 - Optimisations 🟡
+#### Phase 26 - Optimisations 🟡 ✅ TERMINÉE
 **Priorité : NORMALE**
 
-- [ ] **R5** : Thread-safe lazy loading avec `threading.Lock`
-  **Fichier :** `utils/image_processing.py:21-38`
+- [x] **R5** : Thread-safe lazy loading avec `threading.Lock` ✅
+  **Fichier :** `utils/image_processing.py`
+  **Impact :** Double-check locking pattern
 
-- [ ] **R7** : Consolider requêtes `!stats` en une seule
-  **Fichier :** `cogs/user_commands.py:219-260`
+- [x] **R7** : Consolidé requêtes `!stats` (5 → 3) ✅
+  **Fichier :** `cogs/user_commands.py`
+  **Impact :** -40% requêtes DB
 
-- [ ] **R8** : Utiliser `collections.OrderedDict` ou LRU natif
-  **Fichier :** `utils/cache.py:58-69`
+- [x] **R8** : Cache FIFO avec `OrderedDict` (O(n log n) → O(1)) ✅
+  **Fichier :** `utils/cache.py`
+  **Impact :** Éviction en temps constant
 
-- [ ] **R9** : Remplacer f-strings SQL par placeholders
-  **Fichier :** `models/user_profile.py:386,399,412`
+- [x] **R9** : SQL avec placeholders au lieu de f-strings ✅
+  **Fichier :** `models/user_profile.py`
+  **Impact :** Meilleure pratique sécurité
 
 #### Phase 27 - Refactoring (optionnel) 🟢
 **Priorité : BASSE**
@@ -965,10 +969,11 @@ for member_data in pending:
 ### 📊 État du projet
 
 ```
-Score santé : 7.0/10
+Score santé : 7.5/10 (↑0.5)
 Tests       : 196 passants
 Couverture  : ~40% (utils/models complets)
 Version     : 1.1.0
+Phases      : 24-26 terminées
 ```
 
 ---
@@ -1006,4 +1011,7 @@ Version     : 1.1.0
 | 06/01/2026 | fix: conflit alias stats, @sage_only sur !reset | Claude |
 | 06/01/2026 | feat: commande !sudo (debug Sage temporaire) | Claude |
 | 06/01/2026 | Cycle 4 : Analyse globale, 11 risques identifiés, plan Phases 24-27 | Claude |
+| 06/01/2026 | Phase 24 : R1 geocode async, R2 run_bot supprimé | Claude |
+| 06/01/2026 | Phase 25 : R3 Database inutilisé, R6 listener vide, R10 import | Claude |
+| 06/01/2026 | Phase 26 : R5 thread-safe, R7 stats consolidé, R8 cache O(1), R9 SQL | Claude |
 

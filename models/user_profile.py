@@ -383,9 +383,9 @@ class UserProfile:
         Args:
             conn: Connexion asyncpg optionnelle (pour transactions)
         """
-        query = f"UPDATE user_profile SET approval_status = '{ApprovalStatus.APPROVED}' WHERE discord_id = $1"
+        query = "UPDATE user_profile SET approval_status = $1 WHERE discord_id = $2"
         connection = conn or self.db_connection
-        await connection.execute(query, self.discord_id)
+        await connection.execute(query, ApprovalStatus.APPROVED, self.discord_id)
         self.approval_status = ApprovalStatus.APPROVED
         invalidate_profile(self.discord_id)
         logger.info(f"Membre {self.username} approuvé")
@@ -396,9 +396,9 @@ class UserProfile:
         Args:
             conn: Connexion asyncpg optionnelle (pour transactions)
         """
-        query = f"UPDATE user_profile SET approval_status = '{ApprovalStatus.REFUSED}' WHERE discord_id = $1"
+        query = "UPDATE user_profile SET approval_status = $1 WHERE discord_id = $2"
         connection = conn or self.db_connection
-        await connection.execute(query, self.discord_id)
+        await connection.execute(query, ApprovalStatus.REFUSED, self.discord_id)
         self.approval_status = ApprovalStatus.REFUSED
         invalidate_profile(self.discord_id)
         logger.info(f"Membre {self.username} refusé")
@@ -409,13 +409,13 @@ class UserProfile:
         Args:
             conn: Connexion asyncpg optionnelle (pour transactions)
         """
-        query = f"""
+        query = """
         UPDATE user_profile
-        SET approval_status = '{ApprovalStatus.PENDING}', charte_validated = FALSE
-        WHERE discord_id = $1
+        SET approval_status = $1, charte_validated = FALSE
+        WHERE discord_id = $2
         """
         connection = conn or self.db_connection
-        await connection.execute(query, self.discord_id)
+        await connection.execute(query, ApprovalStatus.PENDING, self.discord_id)
         self.approval_status = ApprovalStatus.PENDING
         self.charte_validated = False
         invalidate_profile(self.discord_id)

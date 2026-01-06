@@ -2,9 +2,11 @@
 Cache avec TTL pour le bot Discord.
 
 Fournit un cache en memoire avec expiration automatique.
+Utilise OrderedDict pour une eviction FIFO en O(1).
 """
 
 import asyncio
+from collections import OrderedDict
 from datetime import datetime, timedelta
 from typing import Any, Optional, TypeVar, Generic, Callable
 from functools import wraps
@@ -23,7 +25,7 @@ class TTLCache(Generic[T]):
             ttl_seconds: Duree de vie des entrees en secondes
             max_size: Nombre maximum d'entrees
         """
-        self._cache: dict[str, tuple[T, datetime]] = {}
+        self._cache: OrderedDict[str, tuple[T, datetime]] = OrderedDict()
         self._ttl = timedelta(seconds=ttl_seconds)
         self._max_size = max_size
 
@@ -55,18 +57,18 @@ class TTLCache(Generic[T]):
             key: Cle de l'entree
             value: Valeur a stocker
         """
+        # Si la cle existe deja, la supprimer pour la remettre a la fin
+        if key in self._cache:
+            del self._cache[key]
+
         # Nettoyage si cache plein
         if len(self._cache) >= self._max_size:
             self._cleanup_expired()
 
-        # Si toujours plein, supprimer les plus anciennes
-        if len(self._cache) >= self._max_size:
-            oldest_keys = sorted(
-                self._cache.keys(),
-                key=lambda k: self._cache[k][1]
-            )[:len(self._cache) // 4]
-            for k in oldest_keys:
-                del self._cache[k]
+        # Si toujours plein, supprimer les plus anciennes (FIFO, O(1) par element)
+        while len(self._cache) >= self._max_size:
+            # popitem(last=False) supprime le plus ancien en O(1)
+            self._cache.popitem(last=False)
 
         expires_at = datetime.now() + self._ttl
         self._cache[key] = (value, expires_at)

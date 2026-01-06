@@ -217,13 +217,15 @@ class UserCommandsCog(commands.Cog):
     async def show_stats(self, ctx):
         """Affiche les statistiques de la communaute (en DM)."""
         async with self.bot.db_pool.acquire() as conn:
-            # Stats membres par statut
+            # Stats membres consolidees (1 requete au lieu de 3)
             members_stats = await conn.fetchrow("""
                 SELECT
                     COUNT(*) FILTER (WHERE approval_status != 'deleted') as total,
                     COUNT(*) FILTER (WHERE approval_status = 'approved') as approved,
                     COUNT(*) FILTER (WHERE approval_status = 'pending') as pending,
-                    COUNT(*) FILTER (WHERE approval_status = 'refused') as refused
+                    COUNT(*) FILTER (WHERE approval_status = 'refused') as refused,
+                    COUNT(*) FILTER (WHERE latitude IS NOT NULL AND approval_status != 'deleted') as on_map,
+                    MAX(creation_date) FILTER (WHERE approval_status != 'deleted') as last_reg
                 FROM user_profile
             """)
 
@@ -236,14 +238,6 @@ class UserCommandsCog(commands.Cog):
                 ORDER BY t.id
             """)
 
-            # Stats carte (membres avec localisation)
-            map_stats = await conn.fetchrow("""
-                SELECT
-                    COUNT(*) FILTER (WHERE latitude IS NOT NULL) as on_map,
-                    COUNT(*) FILTER (WHERE approval_status != 'deleted') as total
-                FROM user_profile
-            """)
-
             # Top localisations (depuis location_display)
             locations = await conn.fetch("""
                 SELECT location_display, COUNT(*) as count
@@ -254,12 +248,6 @@ class UserCommandsCog(commands.Cog):
                 GROUP BY location_display
                 ORDER BY count DESC
                 LIMIT 5
-            """)
-
-            # Derniere inscription
-            last_reg = await conn.fetchval("""
-                SELECT MAX(creation_date) FROM user_profile
-                WHERE approval_status != 'deleted'
             """)
 
         # Construire l'embed
@@ -291,9 +279,8 @@ class UserCommandsCog(commands.Cog):
         )
 
         # Carte
-        on_map = map_stats['on_map'] or 0
-        map_total = map_stats['total'] or 1
-        pct = int(on_map / map_total * 100) if map_total > 0 else 0
+        on_map = members_stats['on_map'] or 0
+        pct = int(on_map / total * 100) if total > 0 else 0
         embed.add_field(
             name="🗺️ Carte",
             value=f"Sur la carte : **{on_map}** ({pct}%)",
@@ -310,6 +297,7 @@ class UserCommandsCog(commands.Cog):
             )
 
         # Footer avec derniere inscription
+        last_reg = members_stats['last_reg']
         if last_reg:
             from datetime import datetime
             delta = datetime.now() - last_reg.replace(tzinfo=None)
