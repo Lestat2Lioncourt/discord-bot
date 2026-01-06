@@ -3,7 +3,6 @@ from discord.ext import commands
 import asyncio
 import asyncpg
 import logging
-from pathlib import Path
 
 from config import (
     DISCORD_TOKEN,

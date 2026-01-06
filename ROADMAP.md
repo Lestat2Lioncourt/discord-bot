@@ -899,31 +899,30 @@ for member_data in pending:
 
 ### Plan d'Action Cycle 4
 
-#### Phase 24 - Corrections Critiques 🔴
+#### Phase 24 - Corrections Critiques 🔴 ✅ TERMINÉE
 **Priorité : IMMÉDIATE**
 
-- [ ] **R1** : Remplacer `time.sleep()` par `await asyncio.sleep()`
-  **Fichier :** `utils/retry.py:63`
-  **Impact :** Bot gelé 1-4s à chaque retry
+- [x] **R1** : `geocode()` async avec `asyncio.to_thread()` ✅
+  **Fichiers :** `utils/geocoding.py`, `handlers.py`, `steps.py`, `migrations.py`
+  **Impact :** Event loop plus bloqué pendant retries
 
-- [ ] **R2** : Synchroniser fermeture/création du pool DB
-  **Fichier :** `bot.py:337-341`
-  **Impact :** Connexions orphelines, deadlocks possibles
+- [x] **R2** : Supprimé `run_bot()` orpheline ✅
+  **Fichier :** `bot.py`
+  **Impact :** Code mort supprimé
 
-#### Phase 25 - Nettoyage Code Orphelin 🟠
+#### Phase 25 - Nettoyage Code Orphelin 🟠 ✅ TERMINÉE
 **Priorité : HAUTE**
 
-- [ ] **R3** : Supprimer `self.db = Database()` inutilisé
-  **Fichiers :** `cogs/events.py:40`, `cogs/user_commands.py:35`, `cogs/registration/__init__.py:36`
+- [x] **R3** : Supprimé `self.db = Database()` inutilisé ✅
+  **Fichiers :** `cogs/events.py`, `cogs/user_commands.py`, `cogs/registration/__init__.py`
 
-- [ ] **R4** : Supprimer ou intégrer `run_bot()`
-  **Fichier :** `bot.py:325-341`
+- [x] **R4** : Supprimé `run_bot()` (fait en Phase 24) ✅
 
-- [ ] **R6** : Supprimer `on_member_update()` vide ou l'implémenter
-  **Fichier :** `cogs/events.py:153-155`
+- [x] **R6** : Supprimé `on_member_update()` vide ✅
+  **Fichier :** `cogs/events.py`
 
-- [ ] **R10** : Supprimer imports inutilisés
-  **Fichier :** `bot.py:3-4`
+- [x] **R10** : Supprimé import `Path` inutilisé ✅
+  **Fichier :** `bot.py`
 
 #### Phase 26 - Optimisations 🟡
 **Priorité : NORMALE**

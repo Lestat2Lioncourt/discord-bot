@@ -18,7 +18,6 @@ import discord
 from discord.ext import commands
 from utils.image_processing import process_image
 from utils.logger import get_logger
-from utils.database import Database
 from utils.validators import validate_pseudo, validate_image_attachment
 from utils.discord_helpers import reply_dm
 
@@ -32,8 +31,6 @@ class UserCommandsCog(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
-        self.db = Database(bot.db_pool)
-
 
     @commands.command(name="users", aliases=["utilisateurs", "membres"])
     async def list_users(self, ctx):

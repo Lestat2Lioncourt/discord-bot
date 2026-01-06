@@ -19,7 +19,6 @@ import discord
 from discord.ext import commands
 
 from models.user_profile import UserProfile
-from utils.database import Database
 from utils.logger import get_logger
 
 from .handlers import RegistrationCommands
@@ -33,7 +32,6 @@ class RegistrationCog(RegistrationCommands, commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
-        self.db = Database(bot.db_pool)
         self.active_registrations = {}  # username -> step
 
     async def start_registration(self, member: discord.Member):

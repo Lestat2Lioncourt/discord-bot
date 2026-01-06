@@ -17,7 +17,6 @@ from datetime import datetime, timedelta
 
 from models.user_profile import UserProfile
 from models.player import Player
-from utils.database import Database
 from utils.logger import get_logger
 from utils.roles import assign_newbie_role, is_newbie, is_membre, is_sage
 from utils.i18n import t
@@ -37,7 +36,6 @@ class EventsCog(commands.Cog):
         self.bot = bot
         # TTLCache pour profils actifs (5 min TTL, max 200 entrees)
         self.active_profiles: TTLCache = TTLCache(ttl_seconds=300, max_size=200)
-        self.db = Database(bot.db_pool)  # Initialiser le module de base de donnees
         self.welcome_sent = False  # Flag pour verifier si le message de bienvenue a ete envoye
         # TTLCache pour rappels charte (25h TTL pour couvrir le cooldown de 24h)
         self.charte_reminders: TTLCache = TTLCache(ttl_seconds=90000, max_size=500)
@@ -148,11 +146,6 @@ class EventsCog(commands.Cog):
             logger.debug(f"Impossible d'envoyer rappel charte a {member.name} (DMs fermes)")
         except discord.HTTPException as e:
             logger.error(f"Erreur envoi rappel charte a {member.name}: {e}")
-
-    @commands.Cog.listener()
-    async def on_member_update(self, before, after):
-        """Evenement declenche lorsqu'un utilisateur est mis a jour."""
-        logger.debug(f"Member update: {before.status} -> {after.status}")
 
 
 # ===============================================================================
