@@ -543,6 +543,7 @@ class SagesCog(commands.Cog):
     # Commande !reset (debug uniquement)
     # =========================================================================
     @commands.command(name="reset")
+    @sage_only()
     @debug_only()
     async def cmd_reset(self, ctx, *, search: str = None):
         """Reinitialise un membre pour permettre une nouvelle inscription (debug)."""
