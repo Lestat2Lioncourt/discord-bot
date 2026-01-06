@@ -610,6 +610,11 @@ class SagesCog(commands.Cog):
     @debug_only()
     async def cmd_sudo(self, ctx):
         """Active/desactive les droits Sage temporaires (debug)."""
+        # En mode non-debug, simuler une commande inconnue
+        if not DEBUG_MODE:
+            await ctx.send("Commande `!sudo` inconnue. Tape `!help` pour voir les commandes disponibles.")
+            return
+
         enabled = toggle_sudo(ctx.author.id)
         if enabled:
             await ctx.send(f"🔓 **Sudo activé** pour {ctx.author.display_name}\nTu as maintenant les droits Sage.")
