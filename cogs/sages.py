@@ -24,7 +24,7 @@ from utils.map_generator import regenerate_map_if_needed
 from config import CHANNEL_GENERAL_ID, CHANNEL_SAGE_ID, DEBUG_MODE, DEBUG_USER, ROLE_SAGE_ID, SERVER_ID
 from constants import Teams, ApprovalStatus
 from utils.discord_helpers import find_member, find_member_strict
-from utils.debug import debug_only
+from utils.debug import debug_only, is_sudo, toggle_sudo
 from utils.audit import log_action, AuditAction
 from utils.metrics import metrics
 
@@ -37,6 +37,7 @@ def check_is_sage(user, bot) -> bool:
 
     Fonctionne en contexte serveur (Member avec roles) et en DM (User sans roles).
     En DM, utilise SERVER_ID pour trouver le membre directement.
+    En mode DEBUG, les utilisateurs avec sudo sont aussi consideres Sage.
 
     Args:
         user: L'utilisateur (Member ou User)
@@ -45,6 +46,10 @@ def check_is_sage(user, bot) -> bool:
     Returns:
         True si l'utilisateur est Sage, False sinon
     """
+    # Mode sudo (debug uniquement)
+    if is_sudo(user.id):
+        return True
+
     if hasattr(user, 'roles') and user.roles:
         # Contexte serveur : user est un Member avec roles
         return is_sage(user)
@@ -597,6 +602,19 @@ class SagesCog(commands.Cog):
         )
 
         logger.info(f"Reset de {username} par {ctx.author.name}")
+
+    # =========================================================================
+    # Commande !sudo (debug uniquement)
+    # =========================================================================
+    @commands.command(name="sudo", hidden=True)
+    @debug_only()
+    async def cmd_sudo(self, ctx):
+        """Active/desactive les droits Sage temporaires (debug)."""
+        enabled = toggle_sudo(ctx.author.id)
+        if enabled:
+            await ctx.send(f"🔓 **Sudo activé** pour {ctx.author.display_name}\nTu as maintenant les droits Sage.")
+        else:
+            await ctx.send(f"🔒 **Sudo désactivé** pour {ctx.author.display_name}")
 
     # =========================================================================
     # Commande !delete (suppression complete RGPD)
