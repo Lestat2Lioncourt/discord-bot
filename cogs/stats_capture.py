@@ -22,9 +22,10 @@ from discord.ui import Button, View, Select
 from typing import Optional
 import os
 
-from constants import BuildTypes
+from constants import BuildTypes, EquipmentSlots
 from models.player import Player
 from models.player_stats import PlayerStats
+from models.player_equipment import PlayerEquipment
 from models.user_profile import UserProfile
 from utils.image_processing import extract_stats_v2, format_stats_preview, ExtractedStats
 from utils.discord_helpers import reply_dm
@@ -242,6 +243,7 @@ class StatsCog(commands.Cog):
 
         # Enregistrer en base
         try:
+            # Sauvegarder les stats
             saved_stats = await PlayerStats.create(
                 db_pool=self.bot.db_pool,
                 discord_id=ctx.author.id,
@@ -257,6 +259,24 @@ class StatsCog(commands.Cog):
                 backhand=stats.backhand,
                 build_type=build_view.selected_build
             )
+
+            # Sauvegarder les equipements
+            if stats.equipment:
+                equipment_data = [
+                    {
+                        'slot': eq.slot,
+                        'card_name': eq.card_name,
+                        'card_level': eq.card_level
+                    }
+                    for eq in stats.equipment
+                    if eq.card_name or eq.card_level  # Seulement si au moins une donnee
+                ]
+                if equipment_data:
+                    await PlayerEquipment.create_many(
+                        self.bot.db_pool,
+                        saved_stats.id,
+                        equipment_data
+                    )
 
             success_embed = discord.Embed(
                 title=get_text("stats.saved_title", lang),

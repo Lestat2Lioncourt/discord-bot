@@ -54,6 +54,33 @@ class BuildTypes:
 
 
 # =============================================================================
+# Slots d'equipement Tennis Clash
+# =============================================================================
+class EquipmentSlots:
+    """Les 6 slots d'equipement dans Tennis Clash."""
+    RACKET = 1       # Raquette
+    GRIP = 2         # Grip
+    SHOES = 3        # Chaussures
+    WRIST = 4        # Poignet
+    NUTRITION = 5    # Nutrition
+    TRAINING = 6     # Entrainement
+
+    NAMES = {
+        1: "Raquette",
+        2: "Grip",
+        3: "Chaussures",
+        4: "Poignet",
+        5: "Nutrition",
+        6: "Entrainement",
+    }
+
+    @classmethod
+    def get_name(cls, slot: int) -> str:
+        """Retourne le nom d'un slot."""
+        return cls.NAMES.get(slot, f"Slot {slot}")
+
+
+# =============================================================================
 # Timeouts (en secondes) - valeurs depuis config.py
 # =============================================================================
 from config import (

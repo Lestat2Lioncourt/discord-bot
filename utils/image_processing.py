@@ -270,6 +270,14 @@ def process_image(image_path: str, del_image: bool = True) -> str:
 # =============================================================================
 
 @dataclass
+class ExtractedEquipment:
+    """Un equipement extrait d'une capture."""
+    slot: int                       # 1-6
+    card_name: Optional[str] = None
+    card_level: Optional[int] = None
+
+
+@dataclass
 class ExtractedStats:
     """Donnees extraites d'une capture Tennis Clash."""
     character_name: Optional[str] = None
@@ -281,12 +289,15 @@ class ExtractedStats:
     volley: Optional[int] = None
     forehand: Optional[int] = None
     backhand: Optional[int] = None
-    confidence: float = 0.0  # Score de confiance 0-1
+    equipment: list = None          # Liste de ExtractedEquipment
+    confidence: float = 0.0         # Score de confiance 0-1
     warnings: list = None
 
     def __post_init__(self):
         if self.warnings is None:
             self.warnings = []
+        if self.equipment is None:
+            self.equipment = []
 
     def is_valid(self) -> bool:
         """Verifie si les donnees essentielles sont presentes."""
@@ -433,13 +444,49 @@ def _extract_text_from_region(image, region: Tuple[int, int, int, int]) -> Optio
     return None
 
 
+def _preprocess_for_stats(image):
+    """Preprocessing optimise pour les stats (nom perso + attributs).
+
+    Reglages: luminosite=-127, contraste=2.0
+    """
+    cv2 = _get_cv2()
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    adjusted = cv2.convertScaleAbs(gray, alpha=2.0, beta=-127)
+    _, binary = cv2.threshold(adjusted, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    return binary
+
+
+def _preprocess_for_card_names(image):
+    """Preprocessing optimise pour les noms de cartes.
+
+    Reglages: luminosite=54, contraste=2.5
+    """
+    cv2 = _get_cv2()
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    adjusted = cv2.convertScaleAbs(gray, alpha=2.5, beta=54)
+    _, binary = cv2.threshold(adjusted, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    return binary
+
+
+def _preprocess_for_card_levels(image):
+    """Preprocessing optimise pour les niveaux de cartes.
+
+    Reglages: luminosite=0, contraste=1.5 (initial)
+    """
+    cv2 = _get_cv2()
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    adjusted = cv2.convertScaleAbs(gray, alpha=1.5, beta=0)
+    _, binary = cv2.threshold(adjusted, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    return binary
+
+
 def extract_stats_v2(image_path: str) -> ExtractedStats:
     """Extrait les statistiques d'une capture Tennis Clash (methode optimisee).
 
-    Utilise une approche hybride:
-    1. Extraction du texte complet
-    2. Parsing avec regex robustes
-    3. Validation des valeurs
+    Utilise une approche multi-pass:
+    1. Pass stats: nom perso + 6 attributs (luminosite=-127, contraste=2.0)
+    2. Pass card names: noms des 6 cartes (luminosite=54, contraste=2.5)
+    3. Pass card levels: niveaux des 6 cartes (luminosite=0, contraste=1.5)
 
     Args:
         image_path: Chemin vers l'image
@@ -466,26 +513,25 @@ def extract_stats_v2(image_path: str) -> ExtractedStats:
         height, width = image.shape[:2]
         logger.debug(f"Image: {width}x{height}")
 
-        # Preprocessing global
-        processed = preprocess_image(image)
+        # =====================================================================
+        # PASS 1: Stats (nom perso + attributs)
+        # =====================================================================
+        processed_stats = _preprocess_for_stats(image)
+        text_stats = extract_text_with_debug(processed_stats)
+        logger.debug(f"Pass 1 (stats):\n{text_stats[:500]}...")
 
-        # Extraire tout le texte
-        text = extract_text_with_debug(processed)
-        logger.debug(f"Texte extrait:\n{text}")
-
-        # Patterns de recherche ameliores
         found_count = 0
 
         # Nom et points: "Mei-Li • 1770" ou "Mei-Li - 1770"
         name_pattern = r'([A-Za-z][A-Za-z\-\.]+(?:\s+[A-Za-z]+)?)\s*[\-•·]\s*(\d{3,4})'
-        name_match = re.search(name_pattern, text)
+        name_match = re.search(name_pattern, text_stats)
         if name_match:
             result.character_name = name_match.group(1).strip()
             result.points = int(name_match.group(2))
             found_count += 2
         else:
             # Essayer juste le nom
-            name_only = re.search(r'([A-Z][a-z]+(?:[- ][A-Z][a-z]+)?)\s*[\-•·]', text)
+            name_only = re.search(r'([A-Z][a-z]+(?:[- ][A-Z][a-z]+)?)\s*[\-•·]', text_stats)
             if name_only:
                 result.character_name = name_only.group(1).strip()
                 found_count += 1
@@ -503,10 +549,9 @@ def extract_stats_v2(image_path: str) -> ExtractedStats:
         }
 
         for attr, pattern in stat_patterns.items():
-            match = re.search(pattern, text, re.IGNORECASE)
+            match = re.search(pattern, text_stats, re.IGNORECASE)
             if match:
                 value = int(match.group(1))
-                # Validation: les stats doivent etre entre 1 et 999
                 if 1 <= value <= 999:
                     setattr(result, attr, value)
                     found_count += 1
@@ -515,8 +560,70 @@ def extract_stats_v2(image_path: str) -> ExtractedStats:
             else:
                 result.warnings.append(f"{attr}: non detecte")
 
+        # =====================================================================
+        # PASS 2: Noms des cartes
+        # =====================================================================
+        processed_cards = _preprocess_for_card_names(image)
+        text_cards = extract_text_with_debug(processed_cards)
+        logger.debug(f"Pass 2 (card names):\n{text_cards[:500]}...")
+
+        # Liste de noms de cartes connus (pour matching)
+        known_cards = [
+            # Raquettes
+            "Le marteau", "L'aigle", "Le patriote", "Le guerrier", "Le samourai",
+            "La tornade", "Le cobra", "Le titan", "Le raptor", "Le talon",
+            # Grips
+            "Le koi", "Le zeus", "Le machete", "Le panther", "Le bulldog",
+            # Chaussures
+            "L'enclume", "Le puma", "Le guepard", "Le sprint", "L'eclair",
+            # Poignets
+            "La forge", "Le bracer", "Le shield", "Le power",
+            # Nutrition
+            "Glucides", "Proteines", "Vitamines", "Hydratation", "Energie",
+            # Entrainement
+            "Pliometrie", "Cardio", "Musculation", "Yoga", "Endurance",
+        ]
+
+        # Chercher les noms de cartes dans le texte
+        card_names_found = []
+        text_cards_lower = text_cards.lower()
+        for card in known_cards:
+            if card.lower() in text_cards_lower:
+                card_names_found.append(card)
+
+        logger.debug(f"Cartes trouvees: {card_names_found}")
+
+        # =====================================================================
+        # PASS 3: Niveaux des cartes
+        # =====================================================================
+        processed_levels = _preprocess_for_card_levels(image)
+        text_levels = extract_text_with_debug(processed_levels)
+        logger.debug(f"Pass 3 (card levels):\n{text_levels[:500]}...")
+
+        # Chercher les niveaux (format: chiffre 2 digits, souvent 10-15)
+        level_pattern = r'\b(1[0-9]|[1-9])\b'
+        levels_found = re.findall(level_pattern, text_levels)
+        # Filtrer les niveaux plausibles (entre 1 et 20)
+        card_levels = [int(l) for l in levels_found if 1 <= int(l) <= 20]
+        logger.debug(f"Niveaux trouves: {card_levels}")
+
+        # =====================================================================
+        # Assembler les equipements
+        # =====================================================================
+        # On prend les 6 premiers de chaque liste
+        for slot in range(1, 7):
+            eq = ExtractedEquipment(slot=slot)
+            if slot <= len(card_names_found):
+                eq.card_name = card_names_found[slot - 1]
+                found_count += 1
+            if slot <= len(card_levels):
+                eq.card_level = card_levels[slot - 1]
+                found_count += 1
+            result.equipment.append(eq)
+
         # Calculer le score de confiance
-        total_fields = 9  # nom + points + 7 stats
+        # 9 champs stats + 12 champs equipements (6 noms + 6 niveaux) = 21 total
+        total_fields = 21
         result.confidence = found_count / total_fields
 
         logger.info(f"Extraction: {found_count}/{total_fields} champs (confiance: {result.confidence:.0%})")
@@ -539,6 +646,8 @@ def format_stats_preview(stats: ExtractedStats, lang: str = "FR") -> str:
     Returns:
         Texte formate pour affichage Discord
     """
+    from constants import EquipmentSlots
+
     labels = {
         "FR": {
             "character": "Personnage",
@@ -550,6 +659,7 @@ def format_stats_preview(stats: ExtractedStats, lang: str = "FR") -> str:
             "volley": "Volee",
             "forehand": "Coup Droit",
             "backhand": "Revers",
+            "equipment": "Equipement",
             "confidence": "Confiance",
             "warnings": "Avertissements",
         },
@@ -563,6 +673,7 @@ def format_stats_preview(stats: ExtractedStats, lang: str = "FR") -> str:
             "volley": "Volley",
             "forehand": "Forehand",
             "backhand": "Backhand",
+            "equipment": "Equipment",
             "confidence": "Confidence",
             "warnings": "Warnings",
         }
@@ -581,9 +692,25 @@ def format_stats_preview(stats: ExtractedStats, lang: str = "FR") -> str:
         f"**{l['volley']}:** {stats.volley or '?'}",
         f"**{l['forehand']}:** {stats.forehand or '?'}",
         f"**{l['backhand']}:** {stats.backhand or '?'}",
-        "",
-        f"**{l['confidence']}:** {stats.confidence:.0%}",
     ]
+
+    # Ajouter les equipements
+    if stats.equipment:
+        lines.append("")
+        lines.append(f"**{l['equipment']}:**")
+        for eq in stats.equipment:
+            slot_name = EquipmentSlots.get_name(eq.slot)
+            if eq.card_name and eq.card_level:
+                lines.append(f"  {slot_name}: {eq.card_name} (niv.{eq.card_level})")
+            elif eq.card_name:
+                lines.append(f"  {slot_name}: {eq.card_name}")
+            elif eq.card_level:
+                lines.append(f"  {slot_name}: ??? (niv.{eq.card_level})")
+            else:
+                lines.append(f"  {slot_name}: ???")
+
+    lines.append("")
+    lines.append(f"**{l['confidence']}:** {stats.confidence:.0%}")
 
     if stats.warnings:
         lines.append(f"\n**{l['warnings']}:** {len(stats.warnings)}")
