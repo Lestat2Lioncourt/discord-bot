@@ -628,7 +628,7 @@ def extract_stats_v2(image_path: str) -> ExtractedStats:
             # Slot 3 - Chaussures / Shoes
             "raptor": 3,
             "chasseur": 3, "hunter": 3,
-            "enclume": 3, "anvil": 3,
+            "enclume": 3, "enciume": 3, "enctume": 3, "anvil": 3,  # variantes OCR
             "ballistique": 3, "balistique": 3, "ballistic": 3,
             "plume": 3, "feather": 3,
             "piranha": 3,
