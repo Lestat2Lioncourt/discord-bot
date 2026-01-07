@@ -163,6 +163,9 @@ class StatsCog(commands.Cog):
             await reply_dm(ctx, get_text("stats.invalid_image", lang))
             return
 
+        # Message immediat pour feedback utilisateur
+        await ctx.author.send(get_text("stats.analyzing", lang))
+
         # Telecharger l'image
         image_path = TEMP_DIR / f"capture_{ctx.author.id}_{attachment.filename}"
         try:
@@ -173,7 +176,6 @@ class StatsCog(commands.Cog):
             return
 
         # Extraire les stats
-        await ctx.author.send(get_text("stats.analyzing", lang))
         stats = extract_stats_v2(str(image_path))
 
         # Nettoyer l'image temporaire
