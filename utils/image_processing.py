@@ -537,11 +537,11 @@ def extract_stats_v2(image_path: str) -> ExtractedStats:
                 found_count += 1
                 result.warnings.append("Points non detectes")
 
-        # Stats patterns (plus flexibles)
+        # Stats patterns (plus flexibles - OCR peut mal lire certains caracteres)
         stat_patterns = {
             'global_power': r'(?:PUISSANCE\s*GLOBALE|PUIS[.\s]*GLOB)[^\d]*(\d{2,3})',
             'agility': r'(?:AGILIT[EÉ]|AGI)[^\d]*(\d{2,3})',
-            'endurance': r'(?:ENDURANCE|END)[^\d]*(\d{2,3})',
+            'endurance': r'(?:ENDUR(?:ANCE)?|END(?:UR)?)[^\d]*(\d{2,3})',
             'serve': r'(?:SERVICE|SERV)[^\d]*(\d{2,3})',
             'volley': r'(?:VOL[EÉ]E|VOL)[^\d]*(\d{2,3})',
             'forehand': r'(?:COUP\s*DROIT|CD)[^\d]*(\d{2,3})',
@@ -604,21 +604,21 @@ def extract_stats_v2(image_path: str) -> ExtractedStats:
 
         # Liste de noms de cartes connus (pour matching fuzzy)
         known_cards = [
-            # Raquettes
+            # Raquettes (slot 1)
             "marteau", "aigle", "patriote", "guerrier", "samourai",
-            "tornade", "cobra", "titan", "raptor", "talon", "forge",
-            "outback", "panther", "hachette", "machette",
-            # Grips
-            "koi", "zeus", "bulldog", "sphinx", "rapace",
-            # Chaussures
-            "enclume", "puma", "guepard", "sprint", "eclair", "pirate",
-            # Poignets
-            "bracer", "shield", "tomahawk", "joker",
-            # Nutrition
+            "tornade", "cobra", "titan", "raptor", "talon",
+            "outback", "panther", "hachette", "machette", "zeus",
+            # Grips (slot 2)
+            "forge", "tactique", "bulldog", "sphinx", "rapace",
+            # Chaussures (slot 3)
+            "enclume", "balistique", "puma", "guepard", "sprint", "eclair", "pirate",
+            # Poignets (slot 4)
+            "koi", "koï", "bracer", "shield", "tomahawk", "joker",
+            # Nutrition (slot 5)
             "glucides", "proteines", "vitamines", "hydratation", "energie",
             "macrobiotique", "equilibre",
-            # Entrainement
-            "pliometrie", "cardio", "musculation", "yoga", "resistance",
+            # Entrainement (slot 6)
+            "pliometrie", "pliométrie", "cardio", "musculation", "yoga", "resistance",
         ]
 
         # Chercher les cartes avec pattern "nom : niveau" ou juste le nom
