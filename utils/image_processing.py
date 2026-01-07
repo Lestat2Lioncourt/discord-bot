@@ -572,14 +572,35 @@ def extract_stats_v2(image_path: str) -> ExtractedStats:
         cv2.imwrite(str(debug_equip_path), equip_region)
         logger.debug(f"Zone equipement sauvegardee: {debug_equip_path}")
 
-        # Pass 2: OCR sur la zone equipement avec preprocess pour noms
-        processed_cards = _preprocess_for_card_names(equip_region)
-        debug_cards_path = TEMP_DIR / "debug_cards_preprocess.png"
-        cv2.imwrite(str(debug_cards_path), processed_cards)
+        # Pass 2: OCR sur la zone equipement - essayer plusieurs preprocessings
+        # Essai 1: meme preprocessing que stats (qui fonctionne)
+        processed_stats_style = _preprocess_for_stats(equip_region)
+        debug_path1 = TEMP_DIR / "debug_equip_stats_style.png"
+        cv2.imwrite(str(debug_path1), processed_stats_style)
+        text_stats_style = extract_text_with_debug(processed_stats_style)
 
-        text_cards = extract_text_with_debug(processed_cards)
+        # Essai 2: preprocessing card names
+        processed_cards = _preprocess_for_card_names(equip_region)
+        debug_path2 = TEMP_DIR / "debug_equip_cards_style.png"
+        cv2.imwrite(str(debug_path2), processed_cards)
+        text_cards_style = extract_text_with_debug(processed_cards)
+
+        # Essai 3: grayscale simple avec Otsu
+        gray_equip = cv2.cvtColor(equip_region, cv2.COLOR_BGR2GRAY)
+        _, binary_simple = cv2.threshold(gray_equip, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        debug_path3 = TEMP_DIR / "debug_equip_simple.png"
+        cv2.imwrite(str(debug_path3), binary_simple)
+        text_simple = extract_text_with_debug(binary_simple)
+
+        # Combiner tous les resultats
+        text_cards = f"{text_stats_style}\n{text_cards_style}\n{text_simple}"
+
         # Log IMPORTANT pour debug - texte brut extrait
-        logger.info(f"=== OCR EQUIPEMENT (texte brut) ===\n{text_cards}\n=== FIN OCR ===")
+        logger.info(f"=== OCR EQUIPEMENT (3 passes) ===")
+        logger.info(f"Pass stats_style: {text_stats_style[:200] if text_stats_style else 'VIDE'}")
+        logger.info(f"Pass cards_style: {text_cards_style[:200] if text_cards_style else 'VIDE'}")
+        logger.info(f"Pass simple: {text_simple[:200] if text_simple else 'VIDE'}")
+        logger.info(f"=== FIN OCR ===")
 
         # Liste de noms de cartes connus (pour matching fuzzy)
         known_cards = [
