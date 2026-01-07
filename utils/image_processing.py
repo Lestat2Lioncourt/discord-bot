@@ -86,11 +86,15 @@ def _get_numpy():
 def preprocess_image(image):
     """Prétraite l'image pour améliorer la reconnaissance de texte.
 
+    Utilise les reglages optimises pour Tennis Clash:
+    - Luminosite tres basse (-127)
+    - Contraste eleve (x2)
+
     Args:
         image: Image numpy array (BGR)
 
     Returns:
-        Image binaire prétraitée
+        Image preprocessee pour OCR
     """
     cv2 = _get_cv2()
 
@@ -109,19 +113,12 @@ def preprocess_image(image):
             gray = cv2.resize(gray, (new_width, 1000))
             logger.debug(f"Image redimensionnée à: {gray.shape}")
 
-        # Améliorer le contraste
-        clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
-        gray = clahe.apply(gray)
+        # Reglages optimises pour Tennis Clash (trouves via GIMP)
+        # Luminosite = -127, Contraste = 84 (equiv alpha=2.0)
+        adjusted = cv2.convertScaleAbs(gray, alpha=2.0, beta=-127)
 
-        # Binarisation adaptative
-        binary = cv2.adaptiveThreshold(
-            gray,
-            255,
-            cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-            cv2.THRESH_BINARY,
-            21,  # Augmenté pour mieux gérer le texte
-            11
-        )
+        # Binarisation avec seuil d'Otsu pour nettoyer
+        _, binary = cv2.threshold(adjusted, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
         return binary
 
