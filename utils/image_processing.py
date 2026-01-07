@@ -563,8 +563,9 @@ def extract_stats_v2(image_path: str) -> ExtractedStats:
         # =====================================================================
         # PASS 2 & 3: Equipements (zone basse de l'image)
         # =====================================================================
-        # Les equipements sont dans la partie basse de l'image (40% du bas)
-        equip_y_start = int(height * 0.6)
+        # Les equipements sont dans la partie basse de l'image (50% du bas)
+        # pour capturer les 2 lignes de cartes
+        equip_y_start = int(height * 0.5)
         equip_region = image[equip_y_start:, :]
 
         # Sauvegarder pour debug
