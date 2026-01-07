@@ -578,7 +578,8 @@ def extract_stats_v2(image_path: str) -> ExtractedStats:
         cv2.imwrite(str(debug_cards_path), processed_cards)
 
         text_cards = extract_text_with_debug(processed_cards)
-        logger.debug(f"Pass 2 (card names, zone equip):\n{text_cards}")
+        # Log IMPORTANT pour debug - texte brut extrait
+        logger.info(f"=== OCR EQUIPEMENT (texte brut) ===\n{text_cards}\n=== FIN OCR ===")
 
         # Liste de noms de cartes connus (pour matching fuzzy)
         known_cards = [
@@ -625,8 +626,20 @@ def extract_stats_v2(image_path: str) -> ExtractedStats:
                 if card in text_cards_lower and card.capitalize() not in card_names_found:
                     card_names_found.append(card.capitalize())
 
-        logger.debug(f"Cartes trouvees: {card_names_found}")
-        logger.debug(f"Niveaux trouves: {card_levels_found}")
+        # Fallback: si pas de niveaux trouves, chercher tous les nombres 2 chiffres
+        if len(card_levels_found) == 0:
+            # Chercher tous les nombres de 10 a 20
+            all_numbers = re.findall(r'\b(\d{1,2})\b', text_cards)
+            for num_str in all_numbers:
+                num = int(num_str)
+                if 8 <= num <= 20 and num not in card_levels_found:
+                    card_levels_found.append(num)
+                    if len(card_levels_found) >= 6:
+                        break
+            logger.info(f"Fallback niveaux: {card_levels_found}")
+
+        logger.info(f"Cartes trouvees: {card_names_found}")
+        logger.info(f"Niveaux trouves: {card_levels_found}")
 
         # =====================================================================
         # Assembler les equipements
