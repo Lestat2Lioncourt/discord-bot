@@ -602,77 +602,119 @@ def extract_stats_v2(image_path: str) -> ExtractedStats:
         logger.info(f"Pass simple: {text_simple[:200] if text_simple else 'VIDE'}")
         logger.info(f"=== FIN OCR ===")
 
-        # Liste de noms de cartes connus (pour matching fuzzy)
-        known_cards = [
-            # Raquettes (slot 1)
-            "marteau", "aigle", "patriote", "guerrier", "samourai",
-            "tornade", "cobra", "titan", "raptor", "talon",
-            "outback", "panther", "hachette", "machette", "zeus",
-            # Grips (slot 2)
-            "forge", "tactique", "bulldog", "sphinx", "rapace",
-            # Chaussures (slot 3)
-            "enclume", "balistique", "puma", "guepard", "sprint", "eclair", "pirate",
-            # Poignets (slot 4)
-            "koi", "koï", "bracer", "shield", "tomahawk", "joker",
-            # Nutrition (slot 5)
-            "glucides", "proteines", "vitamines", "hydratation", "energie",
-            "macrobiotique", "equilibre",
-            # Entrainement (slot 6)
-            "pliometrie", "pliométrie", "cardio", "musculation", "yoga", "resistance",
-        ]
+        # Mapping complet des cartes vers leur slot
+        # Source: liste officielle Tennis Clash (FR/EN)
+        CARD_TO_SLOT = {
+            # Slot 1 - Raquette / Racket
+            "basique": 1, "starter racket": 1,
+            "aigle": 1, "eagle": 1,
+            "panthere": 1, "panthère": 1, "panther": 1, "panter": 1,
+            "samourai": 1, "samouraï": 1,
+            "patriote": 1, "patriot": 1,
+            "outback": 1,
+            "marteau": 1, "hammer": 1,
+            "mille": 1, "bullseye": 1,
+            "zeus": 1,
+            # Slot 2 - Grip
+            "guerrier": 2, "warrior": 2,
+            "machette": 2, "machete": 2,
+            "katana": 2,
+            "griffe": 2, "talon": 2,
+            "cobra": 2,
+            "forge": 2,
+            "tactique": 2, "tactical": 2,
+            "titan": 2,
+            # Slot 3 - Chaussures / Shoes
+            "raptor": 3,
+            "chasseur": 3, "hunter": 3,
+            "enclume": 3, "anvil": 3,
+            "ballistique": 3, "balistique": 3, "ballistic": 3,
+            "plume": 3, "feather": 3,
+            "piranha": 3,
+            "shuriken": 3,
+            "hades": 3, "hadès": 3,
+            # Slot 4 - Poignet / Wristband
+            "missile": 4, "rocket": 4,
+            "ara": 4, "macaw": 4,
+            "kodiak": 4,
+            "bouclier": 4, "shield": 4,
+            "tomahawk": 4,
+            "pirate": 4, "jolly": 4,
+            "koi": 4, "koï": 4,
+            "gladiateur": 4, "gladiator": 4,
+            # Slot 5 - Nutrition
+            "vegane": 5, "végane": 5, "vegan": 5,
+            "antioxydants": 5, "antioxidants": 5,
+            "hydratation": 5,
+            "energie": 5, "énergie": 5, "energy": 5,
+            "proteine": 5, "protéine": 5, "protein": 5,
+            "macrobiotique": 5, "macrobiotic": 5,
+            "cetogene": 5, "cétogène": 5, "keto": 5,
+            "glucides": 5, "carboload": 5,
+            # Slot 6 - Entrainement / Workout
+            "pliometrie": 6, "pliométrie": 6, "plyometrics": 6,
+            "musculation": 6, "weight": 6, "lifting": 6,
+            "endurance": 6,
+            "alpinisme": 6, "mountain": 6, "climber": 6,
+            "vitesse": 6, "sprint": 6,
+            "halterophilie": 6, "haltérophilie": 6, "powerlifting": 6,
+            "elastique": 6, "élastique": 6, "resistance": 6,
+            "fentes": 6, "lunges": 6,
+        }
 
-        # Chercher les cartes avec pattern "nom : niveau" ou juste le nom
-        card_names_found = []
-        card_levels_found = []
+        # Chercher les cartes dans le texte OCR
         text_cards_lower = text_cards.lower()
+        # Normaliser les accents pour le matching
+        text_normalized = text_cards_lower.replace('é', 'e').replace('è', 'e').replace('ê', 'e')
+        text_normalized = text_normalized.replace('ï', 'i').replace('ô', 'o').replace('à', 'a')
 
-        # Pattern pour "Le/La Xxx : 12" ou "Xxx 12" ou "Xxx: 12"
-        card_level_pattern = r'(?:le |la |l[\'`])?(\w+)[\s:]+(\d{1,2})\b'
-        matches = re.findall(card_level_pattern, text_cards_lower)
+        # Dictionnaire slot -> (card_name, level)
+        found_equipment = {}  # slot -> {"name": str, "level": int}
 
-        for name, level in matches:
-            level_int = int(level)
-            # Verifier si c'est un nom de carte connu et niveau plausible
-            for known in known_cards:
-                if known in name or name in known:
-                    if 8 <= level_int <= 20:  # Niveaux realistes pour equipement
-                        card_names_found.append(known.capitalize())
-                        card_levels_found.append(level_int)
-                        logger.debug(f"Carte trouvee: {known} niveau {level_int}")
-                        break
+        # Pattern pour "Le/La Xxx" suivi d'un nombre
+        card_pattern = r"(?:le |la |l[''`])?(\w+)(?:[^\d]*?)(\d{1,2})"
+        matches = re.findall(card_pattern, text_normalized)
 
-        # Si pas assez de cartes trouvees, chercher juste les noms
-        if len(card_names_found) < 3:
-            for card in known_cards:
-                if card in text_cards_lower and card.capitalize() not in card_names_found:
-                    card_names_found.append(card.capitalize())
+        for name, level_str in matches:
+            level = int(level_str)
+            if not (8 <= level <= 20):
+                continue
 
-        # Fallback: si pas de niveaux trouves, chercher tous les nombres 2 chiffres
-        if len(card_levels_found) == 0:
-            # Chercher tous les nombres de 10 a 20
-            all_numbers = re.findall(r'\b(\d{1,2})\b', text_cards)
-            for num_str in all_numbers:
-                num = int(num_str)
-                if 8 <= num <= 20 and num not in card_levels_found:
-                    card_levels_found.append(num)
-                    if len(card_levels_found) >= 6:
-                        break
-            logger.info(f"Fallback niveaux: {card_levels_found}")
+            # Chercher dans le mapping
+            for card_key, slot in CARD_TO_SLOT.items():
+                card_normalized = card_key.replace('é', 'e').replace('è', 'e').replace('ê', 'e')
+                card_normalized = card_normalized.replace('ï', 'i').replace('ô', 'o').replace('à', 'a')
 
-        logger.info(f"Cartes trouvees: {card_names_found}")
-        logger.info(f"Niveaux trouves: {card_levels_found}")
+                if card_normalized in name or name in card_normalized:
+                    if slot not in found_equipment:
+                        found_equipment[slot] = {"name": card_key.capitalize(), "level": level}
+                        logger.info(f"Carte detectee: {card_key} -> slot {slot}, niveau {level}")
+                    break
+
+        # Chercher aussi les noms seuls (sans niveau associe)
+        for card_key, slot in CARD_TO_SLOT.items():
+            if slot in found_equipment:
+                continue
+            card_normalized = card_key.replace('é', 'e').replace('è', 'e').replace('ê', 'e')
+            card_normalized = card_normalized.replace('ï', 'i').replace('ô', 'o').replace('à', 'a')
+            if card_normalized in text_normalized:
+                found_equipment[slot] = {"name": card_key.capitalize(), "level": None}
+                logger.info(f"Carte detectee (sans niveau): {card_key} -> slot {slot}")
+
+        logger.info(f"Equipements trouves: {found_equipment}")
 
         # =====================================================================
         # Assembler les equipements
         # =====================================================================
         for slot in range(1, 7):
             eq = ExtractedEquipment(slot=slot)
-            if slot <= len(card_names_found):
-                eq.card_name = card_names_found[slot - 1]
-                found_count += 1
-            if slot <= len(card_levels_found):
-                eq.card_level = card_levels_found[slot - 1]
-                found_count += 1
+            if slot in found_equipment:
+                eq.card_name = found_equipment[slot]["name"]
+                eq.card_level = found_equipment[slot]["level"]
+                if eq.card_name:
+                    found_count += 1
+                if eq.card_level:
+                    found_count += 1
             result.equipment.append(eq)
 
         # Calculer le score de confiance
