@@ -7,7 +7,6 @@ Commandes:
 - !users: Liste des membres enregistres
 - !db_status: Verifie la connexion BDD
 - !pseudo: Modifie le pseudo Discord
-- !template: Traite une image OCR
 - !carte: Lien vers la carte des membres
 - !site: Lien vers le site de la team
 - !stats: Statistiques de la communaute
@@ -16,12 +15,11 @@ Commandes:
 import asyncpg
 import discord
 from discord.ext import commands
-from utils.image_processing import process_image
 from utils.logger import get_logger
-from utils.validators import validate_pseudo, validate_image_attachment
+from utils.validators import validate_pseudo
 from utils.discord_helpers import reply_dm
 
-from config import TEMP_DIR, WEB_URL, SITE_URL
+from config import WEB_URL, SITE_URL
 
 logger = get_logger("cogs.user_commands")
 
@@ -163,39 +161,6 @@ class UserCommandsCog(commands.Cog):
         except asyncpg.PostgresError as e:
             logger.error(f"Erreur mise à jour pseudo: {e}")
             await reply_dm(ctx, "Erreur lors de la mise à jour du pseudo.")
-
-    @commands.command(name="template")
-    async def process_template(self, ctx):
-        """Traite l'image jointe à la commande et génère un fichier JSON (en DM)."""
-        if len(ctx.message.attachments) == 0:
-            await reply_dm(ctx, "Aucune image jointe à la commande.")
-            return
-
-        attachment = ctx.message.attachments[0]
-
-        # Validation de l'image
-        is_valid, error = validate_image_attachment(attachment.filename, attachment.size)
-        if not is_valid:
-            await reply_dm(ctx, f"Erreur: {error}")
-            return
-
-        try:
-            # Télécharger l'image jointe
-            image_path = TEMP_DIR / f"temp_{attachment.filename}"
-            await attachment.save(str(image_path))
-
-            # Traiter l'image avec le script de traitement
-            json_path = process_image(str(image_path))
-
-            # Lire le contenu du fichier JSON
-            with open(json_path, "r", encoding="utf-8") as json_file:
-                json_content = json_file.read()
-
-            await reply_dm(ctx, f"Contenu du fichier JSON généré :\n```json\n{json_content}\n```")
-            logger.info(f"Template traité pour {ctx.author.name}: {attachment.filename}")
-        except OSError as e:
-            logger.error(f"Erreur traitement template (fichier): {e}")
-            await reply_dm(ctx, "Erreur lors du traitement de l'image.")
 
     @commands.command(name="carte", aliases=["map", "members-map"])
     async def show_map(self, ctx):
