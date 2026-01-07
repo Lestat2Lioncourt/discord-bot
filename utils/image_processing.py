@@ -541,7 +541,7 @@ def extract_stats_v2(image_path: str) -> ExtractedStats:
         stat_patterns = {
             'global_power': r'(?:PUISSANCE\s*GLOBALE|PUIS[.\s]*GLOB)[^\d]*(\d{2,3})',
             'agility': r'(?:AGILIT[EÉ]|AGI)[^\d]*(\d{2,3})',
-            'endurance': r'(?:ENDUR(?:ANCE)?|END(?:UR)?)[^\d]*(\d{2,3})',
+            'endurance': r'(?:ENDUR(?:ANCE)?|END(?:UR)?|cuounmce)[^\d]*(\d{2,3})',
             'serve': r'(?:SERVICE|SERV)[^\d]*(\d{2,3})',
             'volley': r'(?:VOL[EÉ]E|VOL)[^\d]*(\d{2,3})',
             'forehand': r'(?:COUP\s*DROIT|CD)[^\d]*(\d{2,3})',
