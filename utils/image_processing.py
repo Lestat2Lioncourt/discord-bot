@@ -603,6 +603,13 @@ def extract_stats_v2(image_path: str) -> ExtractedStats:
         logger.info(f"Pass simple: {text_simple[:200] if text_simple else 'VIDE'}")
         logger.info(f"=== FIN OCR ===")
 
+        # Noms canoniques pour corriger les erreurs OCR a l'affichage
+        CANONICAL_NAMES = {
+            "enciume": "Enclume",
+            "enctume": "Enclume",
+            # Ajouter d'autres corrections OCR si necessaire
+        }
+
         # Mapping complet des cartes vers leur slot
         # Source: liste officielle Tennis Clash (FR/EN)
         CARD_TO_SLOT = {
@@ -688,7 +695,9 @@ def extract_stats_v2(image_path: str) -> ExtractedStats:
 
                 if card_normalized in name or name in card_normalized:
                     if slot not in found_equipment:
-                        found_equipment[slot] = {"name": card_key.capitalize(), "level": level}
+                        # Utiliser le nom canonique si disponible
+                        display_name = CANONICAL_NAMES.get(card_key, card_key.capitalize())
+                        found_equipment[slot] = {"name": display_name, "level": level}
                         logger.info(f"Carte detectee: {card_key} -> slot {slot}, niveau {level}")
                     break
 
@@ -699,7 +708,9 @@ def extract_stats_v2(image_path: str) -> ExtractedStats:
             card_normalized = card_key.replace('é', 'e').replace('è', 'e').replace('ê', 'e')
             card_normalized = card_normalized.replace('ï', 'i').replace('ô', 'o').replace('à', 'a')
             if card_normalized in text_normalized:
-                found_equipment[slot] = {"name": card_key.capitalize(), "level": None}
+                # Utiliser le nom canonique si disponible
+                display_name = CANONICAL_NAMES.get(card_key, card_key.capitalize())
+                found_equipment[slot] = {"name": display_name, "level": None}
                 logger.info(f"Carte detectee (sans niveau): {card_key} -> slot {slot}")
 
         logger.info(f"Equipements trouves: {found_equipment}")
