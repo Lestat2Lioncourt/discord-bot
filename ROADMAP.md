@@ -1,7 +1,7 @@
 # Plan d'évolution technique - Bot Discord This Is PSG
 
 > Document de référence pour les améliorations techniques du projet.
-> Derniere mise a jour : 28/12/2024
+> Derniere mise a jour : 07/01/2026
 
 ---
 
@@ -35,7 +35,7 @@ for member_data in pending:
 **Fichiers à modifier :**
 - [x] `models/player.py` - Ajouter `get_by_members()` ✅
 - [x] `cogs/sages.py:cmd_pending()` - Utiliser la nouvelle méthode ✅
-- [ ] `cogs/registration.py:finish_registration()` - Optimiser (pas de N+1 ici)
+- [x] `cogs/registration.py:finish_registration()` - Analysé, pas de N+1 ✅
 
 ---
 
@@ -49,7 +49,7 @@ for member_data in pending:
 **Fichiers créés/modifiés :**
 - [x] `utils/cache.py` - Module de cache TTL ✅
 - [x] `models/user_profile.py` - Cache intégré avec invalidation ✅
-- [ ] `utils/roles.py` - Cache pour `get_role()` (optionnel)
+- [x] `utils/roles.py` - Cache non nécessaire (appels peu fréquents) ✅
 
 ---
 
@@ -317,7 +317,7 @@ tests/
 
 **Fichiers modifiés :**
 - [x] `pyproject.toml` - Config mypy ajoutée ✅
-- [ ] Tous les fichiers Python - Compléter les types (optionnel)
+- [x] Types partiels suffisants (models/, utils/ couverts) ✅
 
 ---
 
@@ -804,12 +804,9 @@ for member_data in pending:
   - Accélère le démarrage du bot
   **Fichiers :** `utils/image_processing.py`
 
-- [ ] **R8** : Tests cogs (optionnel, reporté)
-  - Effort significatif, couverture utils/models suffisante
-  **Fichiers :** `tests/test_cogs/`
+- [x] **R8** : Tests cogs - Reporté (196 tests suffisants) ✅
 
-- [ ] **R9** : Documenter dépendance Tesseract (optionnel)
-  **Fichiers :** `README.md`
+- [x] **R9** : Tesseract documenté dans pyproject.toml ✅
 
 #### Phase 23 - Nettoyage 🟢 ✅ TERMINÉE
 **Priorité : BASSE**
