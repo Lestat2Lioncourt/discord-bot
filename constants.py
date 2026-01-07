@@ -37,6 +37,23 @@ class Teams:
 
 
 # =============================================================================
+# Types de build (gameplay) Tennis Clash
+# =============================================================================
+class BuildTypes:
+    """Types de build/gameplay pour les joueurs Tennis Clash."""
+    SERVICE_VOLEE = "Service-Volee"
+    PUISSANCE_EQUILIBREE = "Puissance equilibree"
+    PUISSANCE_DESEQUILIBREE = "Puissance desequilibree"
+
+    ALL = [SERVICE_VOLEE, PUISSANCE_EQUILIBREE, PUISSANCE_DESEQUILIBREE]
+
+    @classmethod
+    def is_valid(cls, build_type: str) -> bool:
+        """Verifie si un type de build est valide."""
+        return build_type in cls.ALL
+
+
+# =============================================================================
 # Timeouts (en secondes) - valeurs depuis config.py
 # =============================================================================
 from config import (

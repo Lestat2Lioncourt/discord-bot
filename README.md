@@ -9,7 +9,7 @@ Bot Discord pour la team **This Is PSG** sur Tennis Clash.
 | **Version** | 1.1.0 |
 | **Lignes de code** | 9 336 |
 | **Fichiers Python** | 47 |
-| **Commandes** | 22 |
+| **Commandes** | 25 |
 | **Tests automatisés** | 196 |
 | **Langues** | FR, EN |
 
@@ -26,10 +26,13 @@ Bot Discord pour la team **This Is PSG** sur Tennis Clash.
 | `!langue` | `!language`, `!lang` | Change la langue (FR/EN) |
 | `!carte` | `!map` | Lien vers la carte des membres |
 | `!stats` | `!statistiques` | Statistiques de la communauté |
+| `!capture` | `!cap` | Analyse une capture Tennis Clash |
+| `!evolution` | `!evo`, `!history` | Évolution d'un personnage |
+| `!compare` | `!cmp` | Compare un personnage entre joueurs |
 | `!site` | `!website` | Lien vers le site de la team |
 | `!users` | `!membres` | Liste des membres enregistrés |
 | `!pseudo` | `!nick` | Modifie ton pseudo Discord |
-| `!template` | - | Traite une image OCR |
+| `!template` | - | Traite une image OCR (legacy) |
 | `!db_status` | - | Vérifie la connexion BDD |
 
 ---

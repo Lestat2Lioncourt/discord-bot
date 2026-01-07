@@ -104,7 +104,7 @@
     "general": "🌐 General",
     "general_list": "`!help` - Affiche cette aide\n`!langue / !language` - Change ta langue (FR/EN)\n`!site` - Lien vers le site de la team",
     "profile": "👤 Inscription & Profil",
-    "profile_list": "`!inscription` - Demarre l'inscription\n`!profil` - Affiche ton profil\n`!joueur / !player` - Gere tes joueurs\n`!localisation / !location` - Definit ta position\n`!users / !membres` - Liste des membres\n`!carte / !map` - Carte interactive des membres\n`!stats` - Statistiques de la communaute",
+    "profile_list": "`!inscription` - Demarre l'inscription\n`!profil` - Affiche ton profil\n`!joueur / !player` - Gere tes joueurs\n`!localisation / !location` - Definit ta position\n`!users / !membres` - Liste des membres\n`!carte / !map` - Carte interactive des membres\n`!stats` - Statistiques de la communaute\n`!capture` - Enregistre les stats d'un personnage\n`!evolution` - Evolution d'un personnage\n`!compare` - Compare un personnage entre joueurs",
     "sages": "⚖️ Sages (moderateurs)",
     "sages_list": "`!pending / !attente` - Inscriptions en attente\n`!valider / !approve` - Valide un membre\n`!refuser / !refuse` - Refuse un membre\n`!profil-admin @user` - Profil complet\n`!reset @user` - Reinitialise un membre\n`!delete / !supprimer` - Supprime un membre (RGPD)\n`!metrics` - Statistiques du bot\n`!audit-permissions` - Audit des droits",
     "footer": "This Is PSG - Tennis Clash Team",
@@ -147,5 +147,27 @@
     "profil_admin_location": "Localisation",
     "profil_admin_registered": "Inscription",
     "profil_admin_last_seen": "Derniere connexion"
+  },
+
+  "stats": {
+    "no_image": "Envoie une image avec ta commande. Usage: `!capture` + image jointe",
+    "invalid_image": "Format d'image non supporte. Utilise PNG, JPG ou WEBP.",
+    "download_error": "Erreur lors du telechargement de l'image.",
+    "analyzing": "Analyse de l'image en cours...",
+    "preview_title": "Verification des donnees extraites",
+    "warnings": "Avertissements",
+    "cancelled": "Enregistrement annule.",
+    "no_players": "Tu n'as aucun joueur enregistre. Utilise `!inscription` ou `!joueur` d'abord.",
+    "select_player": "Selectionne le joueur correspondant a cette capture :",
+    "select_build": "Selectionne le type de build :",
+    "saved_title": "Stats enregistrees !",
+    "saved_desc": "Les statistiques de **{character}** ont ete enregistrees pour ton joueur **{player}**.",
+    "save_error": "Erreur lors de l'enregistrement. Reessaie plus tard.",
+    "evo_usage": "Usage: `!evolution <nom du personnage>`\nExemple: `!evolution Mei-Li`",
+    "evo_no_data": "Aucune donnee trouvee pour **{character}**. Utilise `!capture` pour enregistrer des stats.",
+    "evo_title": "Evolution de {character}",
+    "compare_usage": "Usage: `!compare <nom du personnage>`\nExemple: `!compare Mei-Li`",
+    "compare_no_data": "Aucune donnee trouvee pour **{character}**.",
+    "compare_title": "Comparaison : {character}"
   }
 }

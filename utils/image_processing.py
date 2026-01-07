@@ -1,16 +1,23 @@
 """
-Module de traitement d'images pour l'OCR.
+Module de traitement d'images pour l'OCR Tennis Clash.
 
-Les dépendances lourdes (OpenCV, Pillow, pytesseract) sont chargées
-en lazy loading pour accélérer le démarrage du bot.
-Thread-safe grâce à un Lock.
+Les dependances lourdes (OpenCV, Pillow, pytesseract) sont chargees
+en lazy loading pour accelerer le demarrage du bot.
+Thread-safe grace a un Lock.
+
+Strategies d'extraction:
+1. Detection du cadre blanc des stats (region fixe)
+2. Extraction ligne par ligne avec preprocessing agressif
+3. OCR cible avec whitelist de chiffres
 """
 
 import json
 import re
 import os
 import threading
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Optional, Dict, Tuple
 
 from config import TEMP_DIR
 from utils.logger import get_logger
@@ -259,3 +266,329 @@ def process_image(image_path: str, del_image: bool = True) -> str:
         logger.error(f"Erreur lors du traitement: {str(e)}", exc_info=True)
         # Ne pas lever l'exception, retourner un chemin par défaut
         return str(TEMP_DIR / "error.json")
+
+
+# =============================================================================
+# Extraction optimisee pour Tennis Clash (v2)
+# =============================================================================
+
+@dataclass
+class ExtractedStats:
+    """Donnees extraites d'une capture Tennis Clash."""
+    character_name: Optional[str] = None
+    points: Optional[int] = None
+    global_power: Optional[int] = None
+    agility: Optional[int] = None
+    endurance: Optional[int] = None
+    serve: Optional[int] = None
+    volley: Optional[int] = None
+    forehand: Optional[int] = None
+    backhand: Optional[int] = None
+    confidence: float = 0.0  # Score de confiance 0-1
+    warnings: list = None
+
+    def __post_init__(self):
+        if self.warnings is None:
+            self.warnings = []
+
+    def is_valid(self) -> bool:
+        """Verifie si les donnees essentielles sont presentes."""
+        return (
+            self.character_name is not None and
+            self.global_power is not None and
+            self.confidence >= 0.5
+        )
+
+    def to_dict(self) -> dict:
+        """Convertit en dictionnaire pour affichage."""
+        return {
+            "Personnage": self.character_name or "?",
+            "Points": self.points,
+            "Puissance Globale": self.global_power,
+            "Agilite": self.agility,
+            "Endurance": self.endurance,
+            "Service": self.serve,
+            "Volee": self.volley,
+            "Coup Droit": self.forehand,
+            "Revers": self.backhand,
+        }
+
+
+def _find_stats_box(image) -> Optional[Tuple[int, int, int, int]]:
+    """Detecte le cadre blanc des statistiques.
+
+    Le cadre est caracterise par:
+    - Fond blanc/clair
+    - Position sur la droite de l'image
+    - Contient le texte PUISSANCE GLOBALE
+
+    Returns:
+        Tuple (x, y, w, h) de la region ou None si non trouve
+    """
+    cv2 = _get_cv2()
+    np = _get_numpy()
+
+    height, width = image.shape[:2]
+
+    # Le cadre des stats est toujours dans la moitie droite
+    right_half = image[:, width // 2:]
+
+    # Convertir en HSV pour detecter le blanc
+    hsv = cv2.cvtColor(right_half, cv2.COLOR_BGR2HSV)
+
+    # Masque pour le blanc (saturation faible, luminosite haute)
+    lower_white = np.array([0, 0, 200])
+    upper_white = np.array([180, 30, 255])
+    mask = cv2.inRange(hsv, lower_white, upper_white)
+
+    # Trouver les contours
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    # Chercher le plus grand rectangle blanc
+    best_box = None
+    best_area = 0
+
+    for contour in contours:
+        x, y, w, h = cv2.boundingRect(contour)
+        area = w * h
+
+        # Le cadre doit etre significatif et plus haut que large
+        if area > best_area and h > w * 0.5 and area > (height * width * 0.02):
+            best_area = area
+            # Ajuster x pour la position absolue (on etait sur la moitie droite)
+            best_box = (x + width // 2, y, w, h)
+
+    return best_box
+
+
+def _extract_number_from_region(image, region: Tuple[int, int, int, int]) -> Optional[int]:
+    """Extrait un nombre d'une region specifique.
+
+    Args:
+        image: Image complete
+        region: Tuple (x, y, w, h)
+
+    Returns:
+        Nombre extrait ou None
+    """
+    cv2 = _get_cv2()
+    pytesseract = _get_pytesseract()
+
+    x, y, w, h = region
+    crop = image[y:y+h, x:x+w]
+
+    # Convertir en niveaux de gris
+    gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+
+    # Binarisation avec seuil d'Otsu (adaptatif)
+    _, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+    # Inverser si le texte est clair sur fond sombre
+    if binary.mean() > 127:
+        binary = cv2.bitwise_not(binary)
+
+    # OCR avec whitelist de chiffres uniquement
+    config = '--oem 3 --psm 7 -c tessedit_char_whitelist=0123456789'
+    try:
+        text = pytesseract.image_to_string(binary, config=config).strip()
+        if text and text.isdigit():
+            return int(text)
+    except Exception as e:
+        logger.debug(f"OCR region failed: {e}")
+
+    return None
+
+
+def _extract_text_from_region(image, region: Tuple[int, int, int, int]) -> Optional[str]:
+    """Extrait du texte d'une region specifique.
+
+    Args:
+        image: Image complete
+        region: Tuple (x, y, w, h)
+
+    Returns:
+        Texte extrait ou None
+    """
+    cv2 = _get_cv2()
+    pytesseract = _get_pytesseract()
+
+    x, y, w, h = region
+    crop = image[y:y+h, x:x+w]
+
+    # Convertir en niveaux de gris
+    gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+
+    # Ameliorer le contraste
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    gray = clahe.apply(gray)
+
+    # Binarisation
+    _, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+    # OCR
+    config = '--oem 3 --psm 7'
+    try:
+        text = pytesseract.image_to_string(binary, config=config).strip()
+        return text if text else None
+    except Exception as e:
+        logger.debug(f"OCR text region failed: {e}")
+
+    return None
+
+
+def extract_stats_v2(image_path: str) -> ExtractedStats:
+    """Extrait les statistiques d'une capture Tennis Clash (methode optimisee).
+
+    Utilise une approche hybride:
+    1. Extraction du texte complet
+    2. Parsing avec regex robustes
+    3. Validation des valeurs
+
+    Args:
+        image_path: Chemin vers l'image
+
+    Returns:
+        ExtractedStats avec les donnees extraites et score de confiance
+    """
+    cv2 = _get_cv2()
+    pytesseract = _get_pytesseract()
+
+    result = ExtractedStats()
+
+    if not os.path.exists(image_path):
+        result.warnings.append("Image non trouvee")
+        return result
+
+    try:
+        # Lire l'image
+        image = cv2.imread(image_path)
+        if image is None:
+            result.warnings.append("Impossible de lire l'image")
+            return result
+
+        height, width = image.shape[:2]
+        logger.debug(f"Image: {width}x{height}")
+
+        # Preprocessing global
+        processed = preprocess_image(image)
+
+        # Extraire tout le texte
+        text = extract_text_with_debug(processed)
+        logger.debug(f"Texte extrait:\n{text}")
+
+        # Patterns de recherche ameliores
+        found_count = 0
+
+        # Nom et points: "Mei-Li • 1770" ou "Mei-Li - 1770"
+        name_pattern = r'([A-Za-z][A-Za-z\-\.]+(?:\s+[A-Za-z]+)?)\s*[\-•·]\s*(\d{3,4})'
+        name_match = re.search(name_pattern, text)
+        if name_match:
+            result.character_name = name_match.group(1).strip()
+            result.points = int(name_match.group(2))
+            found_count += 2
+        else:
+            # Essayer juste le nom
+            name_only = re.search(r'([A-Z][a-z]+(?:[- ][A-Z][a-z]+)?)\s*[\-•·]', text)
+            if name_only:
+                result.character_name = name_only.group(1).strip()
+                found_count += 1
+                result.warnings.append("Points non detectes")
+
+        # Stats patterns (plus flexibles)
+        stat_patterns = {
+            'global_power': r'(?:PUISSANCE\s*GLOBALE|PUIS[.\s]*GLOB)[^\d]*(\d{2,3})',
+            'agility': r'(?:AGILIT[EÉ]|AGI)[^\d]*(\d{2,3})',
+            'endurance': r'(?:ENDURANCE|END)[^\d]*(\d{2,3})',
+            'serve': r'(?:SERVICE|SERV)[^\d]*(\d{2,3})',
+            'volley': r'(?:VOL[EÉ]E|VOL)[^\d]*(\d{2,3})',
+            'forehand': r'(?:COUP\s*DROIT|CD)[^\d]*(\d{2,3})',
+            'backhand': r'(?:REVERS|REV)[^\d]*(\d{2,3})',
+        }
+
+        for attr, pattern in stat_patterns.items():
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                value = int(match.group(1))
+                # Validation: les stats doivent etre entre 1 et 999
+                if 1 <= value <= 999:
+                    setattr(result, attr, value)
+                    found_count += 1
+                else:
+                    result.warnings.append(f"{attr}: valeur hors limite ({value})")
+            else:
+                result.warnings.append(f"{attr}: non detecte")
+
+        # Calculer le score de confiance
+        total_fields = 9  # nom + points + 7 stats
+        result.confidence = found_count / total_fields
+
+        logger.info(f"Extraction: {found_count}/{total_fields} champs (confiance: {result.confidence:.0%})")
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Erreur extraction v2: {e}", exc_info=True)
+        result.warnings.append(f"Erreur: {str(e)}")
+        return result
+
+
+def format_stats_preview(stats: ExtractedStats, lang: str = "FR") -> str:
+    """Formate les stats pour preview avant enregistrement.
+
+    Args:
+        stats: Donnees extraites
+        lang: Langue (FR/EN)
+
+    Returns:
+        Texte formate pour affichage Discord
+    """
+    labels = {
+        "FR": {
+            "character": "Personnage",
+            "points": "Points",
+            "power": "Puissance Globale",
+            "agility": "Agilite",
+            "endurance": "Endurance",
+            "serve": "Service",
+            "volley": "Volee",
+            "forehand": "Coup Droit",
+            "backhand": "Revers",
+            "confidence": "Confiance",
+            "warnings": "Avertissements",
+        },
+        "EN": {
+            "character": "Character",
+            "points": "Points",
+            "power": "Global Power",
+            "agility": "Agility",
+            "endurance": "Endurance",
+            "serve": "Serve",
+            "volley": "Volley",
+            "forehand": "Forehand",
+            "backhand": "Backhand",
+            "confidence": "Confidence",
+            "warnings": "Warnings",
+        }
+    }
+
+    l = labels.get(lang.upper(), labels["FR"])
+
+    lines = [
+        f"**{l['character']}:** {stats.character_name or '?'}",
+        f"**{l['points']}:** {stats.points or '?'}",
+        "",
+        f"**{l['power']}:** {stats.global_power or '?'}",
+        f"**{l['agility']}:** {stats.agility or '?'}",
+        f"**{l['endurance']}:** {stats.endurance or '?'}",
+        f"**{l['serve']}:** {stats.serve or '?'}",
+        f"**{l['volley']}:** {stats.volley or '?'}",
+        f"**{l['forehand']}:** {stats.forehand or '?'}",
+        f"**{l['backhand']}:** {stats.backhand or '?'}",
+        "",
+        f"**{l['confidence']}:** {stats.confidence:.0%}",
+    ]
+
+    if stats.warnings:
+        lines.append(f"\n**{l['warnings']}:** {len(stats.warnings)}")
+
+    return "\n".join(lines)

@@ -104,7 +104,7 @@
     "general": "🌐 General",
     "general_list": "`!help` - Show this help\n`!language / !langue` - Change your language (FR/EN)\n`!site` - Link to the team website",
     "profile": "👤 Registration & Profile",
-    "profile_list": "`!inscription` - Start registration\n`!profil` - Show your profile\n`!player / !joueur` - Manage your players\n`!location / !localisation` - Set your location\n`!users / !membres` - List members\n`!map / !carte` - Interactive members map\n`!stats` - Community statistics",
+    "profile_list": "`!inscription` - Start registration\n`!profil` - Show your profile\n`!player / !joueur` - Manage your players\n`!location / !localisation` - Set your location\n`!users / !membres` - List members\n`!map / !carte` - Interactive members map\n`!stats` - Community statistics\n`!capture` - Record character stats\n`!evolution` - Character evolution\n`!compare` - Compare character across players",
     "sages": "⚖️ Sages (moderators)",
     "sages_list": "`!pending / !attente` - Pending registrations\n`!approve / !valider` - Approve a member\n`!refuse / !refuser` - Reject a member\n`!profil-admin @user` - Full profile\n`!reset @user` - Reset a member\n`!delete / !supprimer` - Delete a member (GDPR)\n`!metrics` - Bot statistics\n`!audit-permissions` - Permissions audit",
     "footer": "This Is PSG - Tennis Clash Team",
@@ -147,5 +147,27 @@
     "profil_admin_location": "Location",
     "profil_admin_registered": "Registered",
     "profil_admin_last_seen": "Last seen"
+  },
+
+  "stats": {
+    "no_image": "Send an image with your command. Usage: `!capture` + attached image",
+    "invalid_image": "Unsupported image format. Use PNG, JPG or WEBP.",
+    "download_error": "Error downloading the image.",
+    "analyzing": "Analyzing the image...",
+    "preview_title": "Verify extracted data",
+    "warnings": "Warnings",
+    "cancelled": "Recording cancelled.",
+    "no_players": "You have no registered players. Use `!inscription` or `!player` first.",
+    "select_player": "Select the player for this capture:",
+    "select_build": "Select the build type:",
+    "saved_title": "Stats saved!",
+    "saved_desc": "Statistics for **{character}** have been saved for your player **{player}**.",
+    "save_error": "Error saving stats. Please try again later.",
+    "evo_usage": "Usage: `!evolution <character name>`\nExample: `!evolution Mei-Li`",
+    "evo_no_data": "No data found for **{character}**. Use `!capture` to record stats.",
+    "evo_title": "Evolution of {character}",
+    "compare_usage": "Usage: `!compare <character name>`\nExample: `!compare Mei-Li`",
+    "compare_no_data": "No data found for **{character}**.",
+    "compare_title": "Comparison: {character}"
   }
 }
