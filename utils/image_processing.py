@@ -561,63 +561,83 @@ def extract_stats_v2(image_path: str) -> ExtractedStats:
                 result.warnings.append(f"{attr}: non detecte")
 
         # =====================================================================
-        # PASS 2: Noms des cartes
+        # PASS 2 & 3: Equipements (zone basse de l'image)
         # =====================================================================
-        processed_cards = _preprocess_for_card_names(image)
-        text_cards = extract_text_with_debug(processed_cards)
-        logger.debug(f"Pass 2 (card names):\n{text_cards[:500]}...")
+        # Les equipements sont dans la partie basse de l'image (40% du bas)
+        equip_y_start = int(height * 0.6)
+        equip_region = image[equip_y_start:, :]
 
-        # Liste de noms de cartes connus (pour matching)
+        # Sauvegarder pour debug
+        debug_equip_path = TEMP_DIR / "debug_equipment.png"
+        cv2.imwrite(str(debug_equip_path), equip_region)
+        logger.debug(f"Zone equipement sauvegardee: {debug_equip_path}")
+
+        # Pass 2: OCR sur la zone equipement avec preprocess pour noms
+        processed_cards = _preprocess_for_card_names(equip_region)
+        debug_cards_path = TEMP_DIR / "debug_cards_preprocess.png"
+        cv2.imwrite(str(debug_cards_path), processed_cards)
+
+        text_cards = extract_text_with_debug(processed_cards)
+        logger.debug(f"Pass 2 (card names, zone equip):\n{text_cards}")
+
+        # Liste de noms de cartes connus (pour matching fuzzy)
         known_cards = [
             # Raquettes
-            "Le marteau", "L'aigle", "Le patriote", "Le guerrier", "Le samourai",
-            "La tornade", "Le cobra", "Le titan", "Le raptor", "Le talon",
+            "marteau", "aigle", "patriote", "guerrier", "samourai",
+            "tornade", "cobra", "titan", "raptor", "talon", "forge",
+            "outback", "panther", "hachette", "machette",
             # Grips
-            "Le koi", "Le zeus", "Le machete", "Le panther", "Le bulldog",
+            "koi", "zeus", "bulldog", "sphinx", "rapace",
             # Chaussures
-            "L'enclume", "Le puma", "Le guepard", "Le sprint", "L'eclair",
+            "enclume", "puma", "guepard", "sprint", "eclair", "pirate",
             # Poignets
-            "La forge", "Le bracer", "Le shield", "Le power",
+            "bracer", "shield", "tomahawk", "joker",
             # Nutrition
-            "Glucides", "Proteines", "Vitamines", "Hydratation", "Energie",
+            "glucides", "proteines", "vitamines", "hydratation", "energie",
+            "macrobiotique", "equilibre",
             # Entrainement
-            "Pliometrie", "Cardio", "Musculation", "Yoga", "Endurance",
+            "pliometrie", "cardio", "musculation", "yoga", "resistance",
         ]
 
-        # Chercher les noms de cartes dans le texte
+        # Chercher les cartes avec pattern "nom : niveau" ou juste le nom
         card_names_found = []
+        card_levels_found = []
         text_cards_lower = text_cards.lower()
-        for card in known_cards:
-            if card.lower() in text_cards_lower:
-                card_names_found.append(card)
+
+        # Pattern pour "Le/La Xxx : 12" ou "Xxx 12" ou "Xxx: 12"
+        card_level_pattern = r'(?:le |la |l[\'`])?(\w+)[\s:]+(\d{1,2})\b'
+        matches = re.findall(card_level_pattern, text_cards_lower)
+
+        for name, level in matches:
+            level_int = int(level)
+            # Verifier si c'est un nom de carte connu et niveau plausible
+            for known in known_cards:
+                if known in name or name in known:
+                    if 8 <= level_int <= 20:  # Niveaux realistes pour equipement
+                        card_names_found.append(known.capitalize())
+                        card_levels_found.append(level_int)
+                        logger.debug(f"Carte trouvee: {known} niveau {level_int}")
+                        break
+
+        # Si pas assez de cartes trouvees, chercher juste les noms
+        if len(card_names_found) < 3:
+            for card in known_cards:
+                if card in text_cards_lower and card.capitalize() not in card_names_found:
+                    card_names_found.append(card.capitalize())
 
         logger.debug(f"Cartes trouvees: {card_names_found}")
-
-        # =====================================================================
-        # PASS 3: Niveaux des cartes
-        # =====================================================================
-        processed_levels = _preprocess_for_card_levels(image)
-        text_levels = extract_text_with_debug(processed_levels)
-        logger.debug(f"Pass 3 (card levels):\n{text_levels[:500]}...")
-
-        # Chercher les niveaux (format: chiffre 2 digits, souvent 10-15)
-        level_pattern = r'\b(1[0-9]|[1-9])\b'
-        levels_found = re.findall(level_pattern, text_levels)
-        # Filtrer les niveaux plausibles (entre 1 et 20)
-        card_levels = [int(l) for l in levels_found if 1 <= int(l) <= 20]
-        logger.debug(f"Niveaux trouves: {card_levels}")
+        logger.debug(f"Niveaux trouves: {card_levels_found}")
 
         # =====================================================================
         # Assembler les equipements
         # =====================================================================
-        # On prend les 6 premiers de chaque liste
         for slot in range(1, 7):
             eq = ExtractedEquipment(slot=slot)
             if slot <= len(card_names_found):
                 eq.card_name = card_names_found[slot - 1]
                 found_count += 1
-            if slot <= len(card_levels):
-                eq.card_level = card_levels[slot - 1]
+            if slot <= len(card_levels_found):
+                eq.card_level = card_levels_found[slot - 1]
                 found_count += 1
             result.equipment.append(eq)
 
