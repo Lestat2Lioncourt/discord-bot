@@ -518,7 +518,7 @@ def extract_stats_v2(image_path: str) -> ExtractedStats:
         # =====================================================================
         processed_stats = _preprocess_for_stats(image)
         text_stats = extract_text_with_debug(processed_stats)
-        logger.debug(f"Pass 1 (stats):\n{text_stats[:500]}...")
+        logger.info(f"=== OCR STATS (texte brut) ===\n{text_stats[:500]}\n=== FIN STATS ===")
 
         found_count = 0
 
