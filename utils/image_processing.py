@@ -764,6 +764,11 @@ def extract_stats_v2(image_path: str) -> ExtractedStats:
 
         return result
 
+    except Exception as e:
+        logger.error(f"Erreur extraction v2: {e}", exc_info=True)
+        result.warnings.append(f"Erreur: {str(e)}")
+        return result
+
 
 def _save_failed_detection(image_path: str, result: ExtractedStats, text_stats: str, text_cards: str):
     """Sauvegarde une detection echouee pour analyse ulterieure.
