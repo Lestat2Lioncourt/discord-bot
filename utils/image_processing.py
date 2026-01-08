@@ -281,6 +281,7 @@ class ExtractedEquipment:
 class ExtractedStats:
     """Donnees extraites d'une capture Tennis Clash."""
     character_name: Optional[str] = None
+    character_level: Optional[int] = None  # Niveau de la carte personnage
     points: Optional[int] = None
     global_power: Optional[int] = None
     agility: Optional[int] = None
@@ -604,16 +605,64 @@ def extract_stats_v2(image_path: str) -> ExtractedStats:
         cv2.imwrite(str(debug_path3), binary_simple)
         text_simple = extract_text_with_debug(binary_simple)
 
-        # Essai 4: preprocessing pour texte blanc (niveaux)
-        processed_levels = _preprocess_for_card_levels(equip_region)
-        debug_path4 = TEMP_DIR / "debug_equip_levels.png"
-        cv2.imwrite(str(debug_path4), processed_levels)
-        text_levels = extract_text_with_debug(processed_levels)
+        # Essai 4: Detection des niveaux par zones (une par carte)
+        # Layout: 4 colonnes x 2 lignes dans la zone equipement
+        equip_h, equip_w = equip_region.shape[:2]
+        col_width = equip_w // 4
+        row_height = equip_h // 2
 
-        # Combiner tous les resultats
-        text_cards = f"{text_stats_style}\n{text_cards_style}\n{text_simple}\n{text_levels}"
+        # Positions des cartes: (row, col) -> slot
+        # Row 0: Perso, Raquette, Grip, Chaussures
+        # Row 1: (icon), Poignet, Nutrition, Entrainement
+        card_positions = {
+            "perso": (0, 0),
+            1: (0, 1),  # Raquette
+            2: (0, 2),  # Grip
+            3: (0, 3),  # Chaussures
+            4: (1, 1),  # Poignet
+            5: (1, 2),  # Nutrition
+            6: (1, 3),  # Entrainement
+        }
 
-        logger.info(f"Pass levels (white text): {text_levels[:200] if text_levels else 'VIDE'}")
+        detected_levels = {}  # slot -> level
+
+        for slot, (row, col) in card_positions.items():
+            # Extraire la zone de la carte
+            x1 = col * col_width
+            x2 = (col + 1) * col_width
+            y1 = row * row_height
+            y2 = (row + 1) * row_height
+            card_zone = equip_region[y1:y2, x1:x2]
+
+            # Preprocessing pour texte blanc
+            card_processed = _preprocess_for_card_levels(card_zone)
+
+            # OCR avec whitelist de chiffres
+            pytesseract = _get_pytesseract()
+            config = '--oem 3 --psm 7 -c tessedit_char_whitelist=0123456789'
+            try:
+                text = pytesseract.image_to_string(card_processed, config=config).strip()
+                # Chercher un nombre entre 8 et 20
+                numbers = re.findall(r'\b(\d{1,2})\b', text)
+                for num_str in numbers:
+                    num = int(num_str)
+                    if 8 <= num <= 20:
+                        detected_levels[slot] = num
+                        logger.info(f"Niveau detecte zone {slot}: {num}")
+                        break
+            except Exception as e:
+                logger.debug(f"OCR zone {slot} failed: {e}")
+
+        logger.info(f"Niveaux par zone: {detected_levels}")
+
+        # Recuperer le niveau du personnage
+        if "perso" in detected_levels:
+            result.character_level = detected_levels["perso"]
+            found_count += 1
+            logger.info(f"Niveau personnage detecte: {result.character_level}")
+
+        # Combiner tous les resultats (sans text_levels car on utilise les zones)
+        text_cards = f"{text_stats_style}\n{text_cards_style}\n{text_simple}"
 
         # Log IMPORTANT pour debug - texte brut extrait
         logger.info(f"=== OCR EQUIPEMENT (3 passes) ===")
@@ -738,6 +787,21 @@ def extract_stats_v2(image_path: str) -> ExtractedStats:
         logger.info(f"Equipements trouves: {found_equipment}")
 
         # =====================================================================
+        # Integrer les niveaux detectes par zone dans les equipements
+        # =====================================================================
+        for slot in range(1, 7):
+            if slot in detected_levels:
+                if slot in found_equipment:
+                    # Le niveau par zone est plus fiable que le parsing texte
+                    if found_equipment[slot]["level"] is None:
+                        found_equipment[slot]["level"] = detected_levels[slot]
+                        logger.info(f"Niveau slot {slot} complete par zone: {detected_levels[slot]}")
+                else:
+                    # On a un niveau mais pas de nom - creer l'entree
+                    found_equipment[slot] = {"name": None, "level": detected_levels[slot]}
+                    logger.info(f"Niveau slot {slot} ajoute par zone (sans nom): {detected_levels[slot]}")
+
+        # =====================================================================
         # Assembler les equipements
         # =====================================================================
         for slot in range(1, 7):
@@ -752,8 +816,8 @@ def extract_stats_v2(image_path: str) -> ExtractedStats:
             result.equipment.append(eq)
 
         # Calculer le score de confiance
-        # 9 champs stats + 12 champs equipements (6 noms + 6 niveaux) = 21 total
-        total_fields = 21
+        # 9 champs stats + 1 niveau perso + 12 champs equipements (6 noms + 6 niveaux) = 22 total
+        total_fields = 22
         result.confidence = found_count / total_fields
 
         logger.info(f"Extraction: {found_count}/{total_fields} champs (confiance: {result.confidence:.0%})")
@@ -862,8 +926,13 @@ def format_stats_preview(stats: ExtractedStats, lang: str = "FR") -> str:
 
     l = labels.get(lang.upper(), labels["FR"])
 
+    # Personnage avec niveau si disponible
+    char_display = stats.character_name or '?'
+    if stats.character_level:
+        char_display += f" (niv.{stats.character_level})"
+
     lines = [
-        f"**{l['character']}:** {stats.character_name or '?'}",
+        f"**{l['character']}:** {char_display}",
         f"**{l['points']}:** {stats.points or '?'}",
         "",
         f"**{l['power']}:** {stats.global_power or '?'}",
