@@ -626,6 +626,10 @@ def extract_stats_v2(image_path: str) -> ExtractedStats:
 
         detected_levels = {}  # slot -> level
 
+        # Creer dossier debug pour les zones
+        zones_debug_dir = TEMP_DIR / "debug_zones"
+        zones_debug_dir.mkdir(exist_ok=True)
+
         for slot, (row, col) in card_positions.items():
             # Extraire la zone de la carte
             x1 = col * col_width
@@ -634,24 +638,37 @@ def extract_stats_v2(image_path: str) -> ExtractedStats:
             y2 = (row + 1) * row_height
             card_zone = equip_region[y1:y2, x1:x2]
 
+            # Sauvegarder zone originale
+            cv2.imwrite(str(zones_debug_dir / f"zone_{slot}_orig.png"), card_zone)
+
             # Preprocessing pour texte blanc
             card_processed = _preprocess_for_card_levels(card_zone)
 
-            # OCR avec whitelist de chiffres
+            # Sauvegarder zone preprocessee
+            cv2.imwrite(str(zones_debug_dir / f"zone_{slot}_white.png"), card_processed)
+
+            # OCR avec whitelist de chiffres - essayer plusieurs PSM
             pytesseract = _get_pytesseract()
-            config = '--oem 3 --psm 7 -c tessedit_char_whitelist=0123456789'
-            try:
-                text = pytesseract.image_to_string(card_processed, config=config).strip()
-                # Chercher un nombre entre 8 et 20
-                numbers = re.findall(r'\b(\d{1,2})\b', text)
-                for num_str in numbers:
-                    num = int(num_str)
-                    if 8 <= num <= 20:
-                        detected_levels[slot] = num
-                        logger.info(f"Niveau detecte zone {slot}: {num}")
-                        break
-            except Exception as e:
-                logger.debug(f"OCR zone {slot} failed: {e}")
+
+            ocr_results = []
+            for psm in [7, 8, 10, 13]:  # 7=ligne, 8=mot, 10=char, 13=raw
+                config = f'--oem 3 --psm {psm} -c tessedit_char_whitelist=0123456789'
+                try:
+                    text = pytesseract.image_to_string(card_processed, config=config).strip()
+                    if text:
+                        ocr_results.append(f"psm{psm}:{text}")
+                        # Chercher un nombre entre 8 et 20
+                        numbers = re.findall(r'(\d{1,2})', text)
+                        for num_str in numbers:
+                            num = int(num_str)
+                            if 8 <= num <= 20 and slot not in detected_levels:
+                                detected_levels[slot] = num
+                                logger.info(f"Niveau detecte zone {slot} (psm{psm}): {num}")
+                except Exception as e:
+                    pass
+
+            if ocr_results:
+                logger.info(f"Zone {slot} OCR: {ocr_results}")
 
         logger.info(f"Niveaux par zone: {detected_levels}")
 
