@@ -667,8 +667,9 @@ class SagesCog(commands.Cog):
         confirm_msg = await ctx.send(warning, view=view)
 
         # Notifier les autres Sages si c'est une suppression par un Sage
+        # Envoie la meme vue avec boutons dans le salon des Sages
         if not is_self:
-            await notify_sages_deletion_pending(self.bot, member, ctx.author, len(players))
+            await notify_sages_deletion_pending(self.bot, member, ctx.author, len(players), view)
 
         try:
             await asyncio.wait_for(view.wait(), timeout=timeout)
