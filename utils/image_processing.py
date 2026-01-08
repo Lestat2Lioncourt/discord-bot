@@ -661,6 +661,14 @@ def extract_stats_v2(image_path: str) -> ExtractedStats:
             # Sauvegarder zone preprocessee
             cv2.imwrite(str(zones_debug_dir / f"zone_{slot}_white.png"), card_processed)
 
+            # Agrandir l'image si trop petite (ameliore OCR)
+            proc_h, proc_w = card_processed.shape[:2]
+            if proc_h < 50 or proc_w < 50:
+                scale = max(50 / proc_h, 50 / proc_w, 2)
+                new_h, new_w = int(proc_h * scale), int(proc_w * scale)
+                card_processed = cv2.resize(card_processed, (new_w, new_h), interpolation=cv2.INTER_CUBIC)
+                logger.debug(f"Zone {slot} agrandie: {proc_w}x{proc_h} -> {new_w}x{new_h}")
+
             # OCR avec whitelist de chiffres - essayer plusieurs PSM
             pytesseract = _get_pytesseract()
 
@@ -681,8 +689,8 @@ def extract_stats_v2(image_path: str) -> ExtractedStats:
                 except Exception as e:
                     pass
 
-            if ocr_results:
-                logger.info(f"Zone {slot} OCR: {ocr_results}")
+            # Log meme si vide pour debug
+            logger.info(f"Zone {slot} OCR: {ocr_results if ocr_results else 'VIDE'}")
 
         logger.info(f"Niveaux par zone: {detected_levels}")
 
