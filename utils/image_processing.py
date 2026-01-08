@@ -661,6 +661,9 @@ def extract_stats_v2(image_path: str) -> ExtractedStats:
             # Sauvegarder zone preprocessee
             cv2.imwrite(str(zones_debug_dir / f"zone_{slot}_white.png"), card_processed)
 
+            # Inverser (texte noir sur fond blanc - meilleur pour Tesseract)
+            card_processed = cv2.bitwise_not(card_processed)
+
             # Agrandir l'image si trop petite (ameliore OCR)
             proc_h, proc_w = card_processed.shape[:2]
             if proc_h < 50 or proc_w < 50:
@@ -668,6 +671,9 @@ def extract_stats_v2(image_path: str) -> ExtractedStats:
                 new_h, new_w = int(proc_h * scale), int(proc_w * scale)
                 card_processed = cv2.resize(card_processed, (new_w, new_h), interpolation=cv2.INTER_CUBIC)
                 logger.debug(f"Zone {slot} agrandie: {proc_w}x{proc_h} -> {new_w}x{new_h}")
+
+            # Sauvegarder version finale pour OCR
+            cv2.imwrite(str(zones_debug_dir / f"zone_{slot}_final.png"), card_processed)
 
             # OCR avec whitelist de chiffres - essayer plusieurs PSM
             pytesseract = _get_pytesseract()
