@@ -679,9 +679,13 @@ def extract_stats_v2(image_path: str) -> ExtractedStats:
         # Dictionnaire slot -> (card_name, level)
         found_equipment = {}  # slot -> {"name": str, "level": int}
 
-        # Pattern pour "Le/La Xxx" suivi d'un nombre
-        card_pattern = r"(?:le |la |l[''`])?(\w+)(?:[^\d]*?)(\d{1,2})"
-        matches = re.findall(card_pattern, text_normalized)
+        # D'abord, nettoyer le texte des barres de progression (ex: 11/500, 257/300)
+        text_cleaned = re.sub(r'\d+/\d+', '', text_normalized)
+
+        # Pattern pour "Le/La Xxx" suivi d'un nombre (niveau)
+        # Exclut les nombres qui faisaient partie des barres de progression
+        card_pattern = r"(?:le |la |l[''`])?(\w{3,})[\s:]*(\d{1,2})\b"
+        matches = re.findall(card_pattern, text_cleaned)
 
         for name, level_str in matches:
             level = int(level_str)
@@ -695,7 +699,6 @@ def extract_stats_v2(image_path: str) -> ExtractedStats:
 
                 if card_normalized in name or name in card_normalized:
                     if slot not in found_equipment:
-                        # Utiliser le nom canonique si disponible
                         display_name = CANONICAL_NAMES.get(card_key, card_key.capitalize())
                         found_equipment[slot] = {"name": display_name, "level": level}
                         logger.info(f"Carte detectee: {card_key} -> slot {slot}, niveau {level}")
