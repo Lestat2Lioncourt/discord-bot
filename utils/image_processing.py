@@ -664,6 +664,11 @@ def extract_stats_v2(image_path: str) -> ExtractedStats:
             # Inverser (texte noir sur fond blanc - meilleur pour Tesseract)
             card_processed = cv2.bitwise_not(card_processed)
 
+            # Nettoyer le bruit avec erosion puis dilatation (opening)
+            np = _get_numpy()
+            kernel = np.ones((2, 2), np.uint8)
+            card_processed = cv2.morphologyEx(card_processed, cv2.MORPH_OPEN, kernel)
+
             # Agrandir l'image si trop petite (ameliore OCR)
             proc_h, proc_w = card_processed.shape[:2]
             if proc_h < 50 or proc_w < 50:
