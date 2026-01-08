@@ -469,15 +469,26 @@ def _preprocess_for_card_names(image):
 
 
 def _preprocess_for_card_levels(image):
-    """Preprocessing optimise pour les niveaux de cartes.
+    """Preprocessing optimise pour les niveaux de cartes (texte blanc sur fond colore).
 
-    Reglages: luminosite=0, contraste=1.5 (initial)
+    Strategie: isoler le blanc (haute luminosite) puis inverser pour OCR.
     """
     cv2 = _get_cv2()
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    adjusted = cv2.convertScaleAbs(gray, alpha=1.5, beta=0)
-    _, binary = cv2.threshold(adjusted, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    return binary
+    np = _get_numpy()
+
+    # Convertir en HSV pour isoler le blanc (haute Value, basse Saturation)
+    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+
+    # Masque pour le blanc: S < 50, V > 200
+    lower_white = np.array([0, 0, 200])
+    upper_white = np.array([180, 50, 255])
+    white_mask = cv2.inRange(hsv, lower_white, upper_white)
+
+    # Dilater pour connecter les chiffres fragmentes
+    kernel = np.ones((2, 2), np.uint8)
+    white_mask = cv2.dilate(white_mask, kernel, iterations=1)
+
+    return white_mask
 
 
 def extract_stats_v2(image_path: str) -> ExtractedStats:
@@ -593,8 +604,16 @@ def extract_stats_v2(image_path: str) -> ExtractedStats:
         cv2.imwrite(str(debug_path3), binary_simple)
         text_simple = extract_text_with_debug(binary_simple)
 
+        # Essai 4: preprocessing pour texte blanc (niveaux)
+        processed_levels = _preprocess_for_card_levels(equip_region)
+        debug_path4 = TEMP_DIR / "debug_equip_levels.png"
+        cv2.imwrite(str(debug_path4), processed_levels)
+        text_levels = extract_text_with_debug(processed_levels)
+
         # Combiner tous les resultats
-        text_cards = f"{text_stats_style}\n{text_cards_style}\n{text_simple}"
+        text_cards = f"{text_stats_style}\n{text_cards_style}\n{text_simple}\n{text_levels}"
+
+        logger.info(f"Pass levels (white text): {text_levels[:200] if text_levels else 'VIDE'}")
 
         # Log IMPORTANT pour debug - texte brut extrait
         logger.info(f"=== OCR EQUIPEMENT (3 passes) ===")
@@ -739,12 +758,58 @@ def extract_stats_v2(image_path: str) -> ExtractedStats:
 
         logger.info(f"Extraction: {found_count}/{total_fields} champs (confiance: {result.confidence:.0%})")
 
+        # Sauvegarder les cas problematiques pour analyse
+        if result.confidence < 0.7:
+            _save_failed_detection(image_path, result, text_stats, text_cards)
+
         return result
 
+
+def _save_failed_detection(image_path: str, result: ExtractedStats, text_stats: str, text_cards: str):
+    """Sauvegarde une detection echouee pour analyse ulterieure.
+
+    Args:
+        image_path: Chemin de l'image originale
+        result: Resultats de l'extraction
+        text_stats: Texte OCR des stats
+        text_cards: Texte OCR des equipements
+    """
+    import shutil
+    from datetime import datetime
+
+    failed_dir = TEMP_DIR / "failed_detections"
+    failed_dir.mkdir(exist_ok=True)
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    base_name = f"failed_{timestamp}_{result.confidence:.0%}"
+
+    try:
+        # Copier l'image originale
+        if os.path.exists(image_path):
+            ext = Path(image_path).suffix
+            shutil.copy(image_path, failed_dir / f"{base_name}{ext}")
+
+        # Sauvegarder le log OCR
+        log_content = f"""Confidence: {result.confidence:.0%}
+Character: {result.character_name}
+Points: {result.points}
+Stats: power={result.global_power}, agi={result.agility}, end={result.endurance}, ser={result.serve}, vol={result.volley}, cd={result.forehand}, rev={result.backhand}
+Equipment: {[(eq.slot, eq.card_name, eq.card_level) for eq in result.equipment]}
+Warnings: {result.warnings}
+
+=== OCR STATS ===
+{text_stats[:1000]}
+
+=== OCR EQUIPEMENT ===
+{text_cards[:1000]}
+"""
+        with open(failed_dir / f"{base_name}.txt", "w", encoding="utf-8") as f:
+            f.write(log_content)
+
+        logger.info(f"Detection echouee sauvegardee: {failed_dir / base_name}")
+
     except Exception as e:
-        logger.error(f"Erreur extraction v2: {e}", exc_info=True)
-        result.warnings.append(f"Erreur: {str(e)}")
-        return result
+        logger.warning(f"Erreur sauvegarde detection echouee: {e}")
 
 
 def format_stats_preview(stats: ExtractedStats, lang: str = "FR") -> str:
