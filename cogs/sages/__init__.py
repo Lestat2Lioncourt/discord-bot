@@ -35,7 +35,7 @@ from utils.metrics import metrics
 
 from .helpers import check_is_sage, sage_only
 from .views import DeleteConfirmView, DeleteSageConfirmView, ValidationView
-from .notifications import notify_sages_new_registration, notify_sages_returning_member
+from .notifications import notify_sages_new_registration, notify_sages_returning_member, notify_sages_deletion_pending
 
 logger = get_logger("cogs.sages")
 
@@ -665,6 +665,10 @@ class SagesCog(commands.Cog):
             timeout = 300  # 5 minutes
 
         confirm_msg = await ctx.send(warning, view=view)
+
+        # Notifier les autres Sages si c'est une suppression par un Sage
+        if not is_self:
+            await notify_sages_deletion_pending(self.bot, member, ctx.author, len(players))
 
         try:
             await asyncio.wait_for(view.wait(), timeout=timeout)

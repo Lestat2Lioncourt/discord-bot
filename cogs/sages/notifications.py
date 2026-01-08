@@ -169,3 +169,54 @@ async def notify_sages_returning_member(bot, member: discord.Member, returning_i
                 return
 
         logger.warning("Salon des Sages non trouve pour alerte revenant")
+
+
+async def notify_sages_deletion_pending(bot, member: discord.Member, requesting_sage: discord.Member, player_count: int):
+    """
+    Notifie les Sages qu'une suppression est en attente de double validation.
+
+    Args:
+        bot: Instance du bot
+        member: Membre a supprimer
+        requesting_sage: Sage qui demande la suppression
+        player_count: Nombre de joueurs associes
+    """
+    logger.info(f"Suppression en attente: {member.name} demandee par {requesting_sage.name}")
+
+    embed = discord.Embed(
+        title="Suppression en attente de validation",
+        description=(
+            f"**{requesting_sage.display_name}** demande la suppression de **{member.display_name}** (@{member.name}).\n\n"
+            f"**Un autre Sage doit confirmer cette action.**"
+        ),
+        color=discord.Color.red()
+    )
+
+    embed.add_field(name="Membre a supprimer", value=f"{member.display_name} (@{member.name})", inline=True)
+    embed.add_field(name="Demande par", value=requesting_sage.display_name, inline=True)
+    embed.add_field(name="Joueurs associes", value=str(player_count), inline=True)
+    embed.set_footer(text="Rendez-vous dans le salon ou la commande a ete executee pour valider/annuler")
+
+    # Envoyer la notification
+    if DEBUG_MODE:
+        for guild in bot.guilds:
+            debug_member = discord.utils.find(
+                lambda m: m.name.lower() == DEBUG_USER.lower(),
+                guild.members
+            )
+            if debug_member:
+                try:
+                    await debug_member.send(embed=embed)
+                    logger.info(f"Notification suppression envoyee a {DEBUG_USER} (debug)")
+                except discord.Forbidden:
+                    logger.warning(f"Impossible d'envoyer DM a {DEBUG_USER}")
+                return
+    else:
+        for guild in bot.guilds:
+            sage_channel = guild.get_channel(CHANNEL_SAGE_ID)
+            if sage_channel:
+                await sage_channel.send(embed=embed)
+                logger.info("Notification suppression envoyee dans le salon des Sages")
+                return
+
+        logger.warning("Salon des Sages non trouve pour notification suppression")
