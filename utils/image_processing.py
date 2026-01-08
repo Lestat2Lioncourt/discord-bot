@@ -641,8 +641,16 @@ def extract_stats_v2(image_path: str) -> ExtractedStats:
             # Sauvegarder zone originale
             cv2.imwrite(str(zones_debug_dir / f"zone_{slot}_orig.png"), card_zone)
 
+            # Cibler le coin inferieur gauche (ou se trouve le niveau)
+            # Le niveau est dans les 35% du bas et 40% de la gauche
+            zone_h, zone_w = card_zone.shape[:2]
+            level_zone = card_zone[int(zone_h * 0.65):, :int(zone_w * 0.40)]
+
+            # Sauvegarder la zone niveau
+            cv2.imwrite(str(zones_debug_dir / f"zone_{slot}_level_area.png"), level_zone)
+
             # Preprocessing pour texte blanc
-            card_processed = _preprocess_for_card_levels(card_zone)
+            card_processed = _preprocess_for_card_levels(level_zone)
 
             # Sauvegarder zone preprocessee
             cv2.imwrite(str(zones_debug_dir / f"zone_{slot}_white.png"), card_processed)
