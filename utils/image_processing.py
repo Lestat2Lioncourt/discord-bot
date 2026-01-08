@@ -641,10 +641,16 @@ def extract_stats_v2(image_path: str) -> ExtractedStats:
             # Sauvegarder zone originale
             cv2.imwrite(str(zones_debug_dir / f"zone_{slot}_orig.png"), card_zone)
 
-            # Cibler le coin inferieur gauche (ou se trouve le niveau)
-            # Le niveau est dans les 35% du bas et 40% de la gauche
+            # Cibler la zone ou se trouve le niveau
+            # Row 0: cartes en bas de la zone -> niveau dans le bas-gauche
+            # Row 1: cartes en haut de la zone -> niveau vers le milieu-gauche
             zone_h, zone_w = card_zone.shape[:2]
-            level_zone = card_zone[int(zone_h * 0.65):, :int(zone_w * 0.40)]
+            if row == 0:
+                # Ligne du haut: niveau dans les 35% du bas, 40% de la gauche
+                level_zone = card_zone[int(zone_h * 0.65):, :int(zone_w * 0.40)]
+            else:
+                # Ligne du bas: niveau dans la bande 30%-65% verticale, 40% de la gauche
+                level_zone = card_zone[int(zone_h * 0.30):int(zone_h * 0.65), :int(zone_w * 0.40)]
 
             # Sauvegarder la zone niveau
             cv2.imwrite(str(zones_debug_dir / f"zone_{slot}_level_area.png"), level_zone)
