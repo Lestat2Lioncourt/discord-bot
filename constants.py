@@ -40,17 +40,97 @@ class Teams:
 # Types de build (gameplay) Tennis Clash
 # =============================================================================
 class BuildTypes:
-    """Types de build/gameplay pour les joueurs Tennis Clash."""
-    SERVICE_VOLEE = "Service-Volee"
-    PUISSANCE_EQUILIBREE = "Puissance equilibree"
-    PUISSANCE_DESEQUILIBREE = "Puissance desequilibree"
+    """Types de build/gameplay pour les joueurs Tennis Clash.
 
-    ALL = [SERVICE_VOLEE, PUISSANCE_EQUILIBREE, PUISSANCE_DESEQUILIBREE]
+    Le build est maintenant calcule automatiquement a partir des stats.
+    """
+    # Noms des stats en francais pour l'affichage
+    STAT_NAMES = {
+        "agility": "Agilite",
+        "endurance": "Endurance",
+        "serve": "Service",
+        "volley": "Volee",
+        "forehand": "Coup droit",
+        "backhand": "Revers",
+    }
+
+    # Profils predefinis (combinaisons connues -> nom du profil)
+    # Cle: tuple de stats triees alphabetiquement
+    # A completer manuellement apres analyse des builds calcules
+    PROFILES = {
+        # ("backhand", "forehand", "serve"): "Puissance",
+        # ("agility", "endurance"): "Defense",
+        # ("serve", "volley"): "Serve-Volee",
+    }
+
+    # Seuils pour le calcul automatique
+    THRESHOLD_DOMINANT = 0.20   # +20% au-dessus de la moyenne = stat dominante
+    THRESHOLD_BALANCED = 0.15  # Si toutes les stats sont a +/-15% = equilibre
+
+    @classmethod
+    def calculate(cls, stats: dict) -> str:
+        """Calcule automatiquement le type de build a partir des stats.
+
+        Args:
+            stats: Dict avec agility, endurance, serve, volley, forehand, backhand
+
+        Returns:
+            Nom du build (ex: "Agilite-Volee" ou "Equilibre")
+        """
+        if not stats:
+            return "Inconnu"
+
+        # Recuperer les valeurs des 6 stats
+        stat_values = {
+            key: stats.get(key, 0) or 0
+            for key in cls.STAT_NAMES.keys()
+        }
+
+        values = list(stat_values.values())
+        if not values or sum(values) == 0:
+            return "Inconnu"
+
+        # Calculer la moyenne
+        mean = sum(values) / len(values)
+
+        # Calculer l'ecart relatif pour chaque stat
+        deviations = {
+            key: (value - mean) / mean if mean > 0 else 0
+            for key, value in stat_values.items()
+        }
+
+        # Verifier si le build est equilibre (toutes les stats a +/-15%)
+        if all(abs(dev) <= cls.THRESHOLD_BALANCED for dev in deviations.values()):
+            return "Equilibre"
+
+        # Trouver les stats dominantes (+20% au-dessus de la moyenne)
+        dominant_stats = [
+            key for key, dev in deviations.items()
+            if dev >= cls.THRESHOLD_DOMINANT
+        ]
+
+        # Trier par valeur decroissante et garder 2-3 max
+        dominant_stats.sort(key=lambda k: stat_values[k], reverse=True)
+        dominant_stats = dominant_stats[:3]
+
+        if not dominant_stats:
+            # Pas de stat vraiment dominante, prendre les 2 plus hautes
+            sorted_stats = sorted(stat_values.items(), key=lambda x: x[1], reverse=True)
+            dominant_stats = [s[0] for s in sorted_stats[:2]]
+
+        # Verifier si ca correspond a un profil predefini
+        profile_key = tuple(sorted(dominant_stats))
+        if profile_key in cls.PROFILES:
+            return cls.PROFILES[profile_key]
+
+        # Sinon, concatener les noms de stats
+        stat_names = [cls.STAT_NAMES[s] for s in dominant_stats]
+        return "-".join(stat_names)
 
     @classmethod
     def is_valid(cls, build_type: str) -> bool:
-        """Verifie si un type de build est valide."""
-        return build_type in cls.ALL
+        """Verifie si un type de build est valide (toujours True maintenant)."""
+        return True  # Les builds sont calcules dynamiquement
 
 
 # =============================================================================
