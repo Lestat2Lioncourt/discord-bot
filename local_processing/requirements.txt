@@ -1,0 +1,3 @@
+# Dépendances pour le traitement local des images
+asyncpg>=0.29.0
+python-dotenv>=1.0.0
