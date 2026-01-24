@@ -234,7 +234,7 @@ class CaptureQueue:
             await conn.execute(
                 query,
                 new_status,
-                result_json,  # asyncpg gere automatiquement JSONB
+                json.dumps(result_json) if result_json else None,
                 error_message,
                 self.id
             )
@@ -270,8 +270,12 @@ class CaptureQueue:
             Instance CaptureQueue
         """
         result_json = row['result_json']
-        if isinstance(result_json, str):
-            result_json = json.loads(result_json)
+        # Gerer le double-encodage potentiel (string JSON dans JSONB)
+        while isinstance(result_json, str):
+            try:
+                result_json = json.loads(result_json)
+            except (json.JSONDecodeError, TypeError):
+                break
 
         return cls(
             id=row['id'],
