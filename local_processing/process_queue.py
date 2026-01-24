@@ -85,41 +85,16 @@ def call_claude_code(image_path: str) -> str:
     Returns:
         Réponse brute de Claude
     """
-    # Prompt qui demande directement le JSON
-    prompt = """Analyse cette capture d'écran Tennis Clash et retourne UNIQUEMENT un JSON valide (sans markdown, sans explication, sans tableau, sans commentaire) avec cette structure exacte:
-
-{
-    "character_name": "nom du personnage",
-    "character_level": 14,
-    "points": 2122,
-    "global_power": 413,
-    "stats": {
-        "agility": 98,
-        "endurance": 70,
-        "serve": 45,
-        "volley": 38,
-        "forehand": 71,
-        "backhand": 91
-    },
-    "equipment": [
-        {"slot": 1, "name": "Nom raquette", "level": 14},
-        {"slot": 2, "name": "Nom grip", "level": 14},
-        {"slot": 3, "name": "Nom chaussures", "level": 13},
-        {"slot": 4, "name": "Nom poignet", "level": 14},
-        {"slot": 5, "name": "Nom nutrition", "level": 14},
-        {"slot": 6, "name": "Nom entrainement", "level": 14}
-    ]
-}
-
-IMPORTANT: Retourne UNIQUEMENT le JSON brut. Pas de texte, pas de markdown, pas d'explication."""
+    # Prompt strict pour obtenir uniquement du JSON
+    prompt = f'Tu es un extracteur de donnees JSON. Lis l\'image {image_path} et retourne UNIQUEMENT ce JSON sans aucun texte ni markdown: {{"character_name":"...","character_level":0,"points":0,"global_power":0,"stats":{{"agility":0,"endurance":0,"serve":0,"volley":0,"forehand":0,"backhand":0}},"equipment":[{{"slot":1,"name":"...","level":0}},{{"slot":2,"name":"...","level":0}},{{"slot":3,"name":"...","level":0}},{{"slot":4,"name":"...","level":0}},{{"slot":5,"name":"...","level":0}},{{"slot":6,"name":"...","level":0}}]}}'
 
     # Dossier du script
     script_dir = Path(__file__).parent
 
     cmd = [
         CLAUDE_CMD,
-        prompt,
-        image_path
+        "-p",  # Mode print (sortie brute sans UI interactive)
+        prompt
     ]
 
     print(f"  Appel Claude Code...")
@@ -128,6 +103,7 @@ IMPORTANT: Retourne UNIQUEMENT le JSON brut. Pas de texte, pas de markdown, pas 
         cmd,
         capture_output=True,
         text=True,
+        encoding='utf-8',  # Forcer UTF-8 pour éviter les problèmes Windows
         timeout=180,  # 3 minutes max
         cwd=script_dir  # Travailler dans le dossier du script
     )
@@ -260,18 +236,18 @@ async def process_capture(conn, capture: dict) -> bool:
 
         # Mettre à jour la base
         await update_capture_completed(conn, capture_id, result)
-        print(f"  ✓ Traitement réussi")
+        print(f"  [OK] Traitement réussi")
         return True
 
     except subprocess.TimeoutExpired:
         error = "Timeout Claude Code (>180s)"
-        print(f"  ✗ {error} (reste en pending pour retry)")
+        print(f"  [ERREUR] {error} (reste en pending pour retry)")
         # On laisse en pending pour réessayer plus tard
         return False
 
     except Exception as e:
         error = str(e)
-        print(f"  ✗ Erreur: {error[:100]} (reste en pending pour retry)")
+        print(f"  [ERREUR] Erreur: {error[:100]} (reste en pending pour retry)")
         # On laisse en pending pour réessayer plus tard
         return False
 
