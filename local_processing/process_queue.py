@@ -16,6 +16,7 @@ import asyncio
 import asyncpg
 import json
 import os
+import platform
 import re
 import subprocess
 import sys
@@ -24,6 +25,9 @@ from datetime import datetime
 from pathlib import Path
 
 from dotenv import load_dotenv
+
+# Commande Claude selon l'OS
+CLAUDE_CMD = "claude.cmd" if platform.system() == "Windows" else "claude"
 
 # Charger la config locale
 load_dotenv(".env.local")
@@ -76,15 +80,45 @@ def call_claude_code(image_path: str) -> str:
     """Appelle Claude Code CLI avec l'image.
 
     Args:
-        image_path: Chemin vers l'image à analyser
+        image_path: Chemin vers l'image à analyser (relatif au script)
 
     Returns:
         Réponse brute de Claude
     """
+    # Prompt qui demande directement le JSON
+    prompt = """Analyse cette capture d'écran Tennis Clash et retourne UNIQUEMENT un JSON valide (sans markdown, sans explication, sans tableau, sans commentaire) avec cette structure exacte:
+
+{
+    "character_name": "nom du personnage",
+    "character_level": 14,
+    "points": 2122,
+    "global_power": 413,
+    "stats": {
+        "agility": 98,
+        "endurance": 70,
+        "serve": 45,
+        "volley": 38,
+        "forehand": 71,
+        "backhand": 91
+    },
+    "equipment": [
+        {"slot": 1, "name": "Nom raquette", "level": 14},
+        {"slot": 2, "name": "Nom grip", "level": 14},
+        {"slot": 3, "name": "Nom chaussures", "level": 13},
+        {"slot": 4, "name": "Nom poignet", "level": 14},
+        {"slot": 5, "name": "Nom nutrition", "level": 14},
+        {"slot": 6, "name": "Nom entrainement", "level": 14}
+    ]
+}
+
+IMPORTANT: Retourne UNIQUEMENT le JSON brut. Pas de texte, pas de markdown, pas d'explication."""
+
+    # Dossier du script
+    script_dir = Path(__file__).parent
+
     cmd = [
-        "claude",
-        "-p", ANALYSIS_PROMPT,
-        "--output-format", "text",
+        CLAUDE_CMD,
+        prompt,
         image_path
     ]
 
@@ -94,7 +128,8 @@ def call_claude_code(image_path: str) -> str:
         cmd,
         capture_output=True,
         text=True,
-        timeout=120
+        timeout=180,  # 3 minutes max
+        cwd=script_dir  # Travailler dans le dossier du script
     )
 
     if result.returncode != 0:
@@ -114,22 +149,45 @@ def parse_json_response(response: str) -> dict:
     """
     text = response.strip()
 
+    # Retirer les décorations Claude Code (●, >, etc.)
+    lines = text.split('\n')
+    cleaned_lines = []
+    for line in lines:
+        # Retirer les préfixes de décoration
+        line = re.sub(r'^[●❯>\s]+', '', line)
+        cleaned_lines.append(line)
+    text = '\n'.join(cleaned_lines)
+
     # Retirer les blocs de code markdown si présents
     if "```" in text:
-        # Extraire le contenu entre ```
         match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', text)
         if match:
             text = match.group(1)
 
-    # Parser le JSON
+    # Parser le JSON directement
     try:
         return json.loads(text)
     except json.JSONDecodeError:
-        # Essayer de trouver le JSON dans la réponse
-        json_match = re.search(r'\{[\s\S]*\}', text)
-        if json_match:
+        pass
+
+    # Essayer de trouver le JSON dans la réponse (entre { et })
+    json_match = re.search(r'\{[\s\S]*\}', text)
+    if json_match:
+        try:
             return json.loads(json_match.group())
-        raise Exception(f"Invalid JSON response: {text[:200]}...")
+        except json.JSONDecodeError:
+            pass
+
+    # Dernier essai: nettoyer les caractères problématiques
+    text_clean = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', text)
+    json_match = re.search(r'\{[\s\S]*\}', text_clean)
+    if json_match:
+        try:
+            return json.loads(json_match.group())
+        except json.JSONDecodeError:
+            pass
+
+    raise Exception(f"Invalid JSON response: {text[:200]}...")
 
 
 async def get_pending_captures(conn) -> list:
@@ -184,14 +242,16 @@ async def process_capture(conn, capture: dict) -> bool:
 
     print(f"\n[{capture_id}] Traitement capture de {username} (joueur: {player})")
 
-    # Sauvegarder l'image temporairement
-    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
+    # Sauvegarder l'image dans le dossier courant (pour que Claude Code la trouve)
+    script_dir = Path(__file__).parent
+    temp_path = script_dir / f"capture_{capture_id}.png"
+
+    with open(temp_path, "wb") as f:
         f.write(capture["image_data"])
-        temp_path = f.name
 
     try:
-        # Appeler Claude Vision
-        raw_response = call_claude_code(temp_path)
+        # Appeler Claude Vision avec chemin relatif
+        raw_response = call_claude_code(f"./capture_{capture_id}.png")
 
         # Parser le JSON
         result = parse_json_response(raw_response)
@@ -204,20 +264,20 @@ async def process_capture(conn, capture: dict) -> bool:
         return True
 
     except subprocess.TimeoutExpired:
-        error = "Timeout Claude Code (>120s)"
-        print(f"  ✗ {error}")
-        await update_capture_failed(conn, capture_id, error)
+        error = "Timeout Claude Code (>180s)"
+        print(f"  ✗ {error} (reste en pending pour retry)")
+        # On laisse en pending pour réessayer plus tard
         return False
 
     except Exception as e:
         error = str(e)
-        print(f"  ✗ Erreur: {error[:100]}")
-        await update_capture_failed(conn, capture_id, error)
+        print(f"  ✗ Erreur: {error[:100]} (reste en pending pour retry)")
+        # On laisse en pending pour réessayer plus tard
         return False
 
     finally:
         # Nettoyer le fichier temporaire
-        Path(temp_path).unlink(missing_ok=True)
+        temp_path.unlink(missing_ok=True)
 
 
 async def main(dry_run: bool = False):

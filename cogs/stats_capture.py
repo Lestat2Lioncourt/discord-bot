@@ -15,7 +15,7 @@ Flow de !capture (asynchrone):
 """
 
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 from discord import ButtonStyle, SelectOption
 from discord.ui import Button, View, Select
 from typing import Optional
@@ -163,29 +163,63 @@ class StatsCog(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
-        self._notified_users = set()  # Pour eviter de notifier plusieurs fois par session
+        self._notified_captures = set()  # IDs des captures deja notifiees
 
-    @commands.Cog.listener()
-    async def on_command(self, ctx):
-        """Verifie si l'utilisateur a des analyses pretes a chaque commande."""
-        # Eviter les boucles et les checks repetes
-        if ctx.author.id in self._notified_users:
-            return
+    async def cog_load(self):
+        """Demarre la tache de check des analyses."""
+        self.check_completed_captures.start()
 
+    async def cog_unload(self):
+        """Arrete la tache de check des analyses."""
+        self.check_completed_captures.cancel()
+
+    @tasks.loop(minutes=5)
+    async def check_completed_captures(self):
+        """Verifie toutes les 5 minutes s'il y a des analyses terminees."""
         try:
-            # Verifier s'il y a des captures completees pour cet utilisateur
-            completed = await CaptureQueue.get_completed_for_user(
-                self.bot.db_pool, ctx.author.id
-            )
+            # Recuperer toutes les captures completees
+            async with self.bot.db_pool.acquire() as conn:
+                rows = await conn.fetch("""
+                    SELECT * FROM capture_queue
+                    WHERE status = 'completed'
+                    ORDER BY processed_at ASC
+                """)
 
-            if completed:
-                self._notified_users.add(ctx.author.id)
-                # Notifier pour chaque capture
-                for capture in completed:
-                    await self._notify_capture_ready(ctx.author, capture)
+            if not rows:
+                return
+
+            logger.info(f"Check periodique: {len(rows)} capture(s) completee(s) a notifier")
+
+            for row in rows:
+                capture_id = row['id']
+
+                # Eviter de notifier plusieurs fois la meme capture
+                if capture_id in self._notified_captures:
+                    continue
+
+                # Trouver l'utilisateur
+                user = self.bot.get_user(row['discord_user_id'])
+                if not user:
+                    try:
+                        user = await self.bot.fetch_user(row['discord_user_id'])
+                    except discord.NotFound:
+                        logger.warning(f"Utilisateur {row['discord_user_id']} introuvable")
+                        continue
+
+                # Creer l'objet CaptureQueue
+                capture = CaptureQueue._from_row(row)
+
+                # Notifier
+                self._notified_captures.add(capture_id)
+                await self._notify_capture_ready(user, capture)
 
         except Exception as e:
-            logger.error(f"Erreur check captures completees: {e}")
+            logger.error(f"Erreur check periodique captures: {e}")
+
+    @check_completed_captures.before_loop
+    async def before_check_completed(self):
+        """Attend que le bot soit pret avant de demarrer la tache."""
+        await self.bot.wait_until_ready()
 
     async def _notify_capture_ready(self, user: discord.User, capture: CaptureQueue):
         """Notifie l'utilisateur qu'une capture a ete analysee et lui permet de valider.
@@ -341,8 +375,8 @@ class StatsCog(commands.Cog):
             # Marquer comme valide
             await capture.update_status(self.bot.db_pool, CaptureStatus.VALIDATED)
 
-            # Retirer de la liste des notifies pour permettre de nouvelles notifs
-            self._notified_users.discard(user.id)
+            # Retirer de la liste des captures notifiees
+            self._notified_captures.discard(capture.id)
 
             await msg.edit(
                 content=f"Stats enregistrees pour **{result.get('character_name')}** ({selected_player.player_name if selected_player else '?'}) !",
@@ -362,6 +396,7 @@ class StatsCog(commands.Cog):
             msg: Message a mettre a jour
         """
         await capture.update_status(self.bot.db_pool, CaptureStatus.REJECTED)
+        self._notified_captures.discard(capture.id)
         await msg.edit(content="Capture refusee et supprimee.", embed=None, view=None)
         logger.info(f"Capture {capture.id} refusee")
 
@@ -387,6 +422,9 @@ class StatsCog(commands.Cog):
         if not attachment.filename.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
             await reply_dm(ctx, get_text("stats.invalid_image", lang))
             return
+
+        # Message immediat
+        await reply_dm(ctx, "Transmission au moteur IA en cours...")
 
         # Telecharger l'image en memoire (bytes)
         try:
