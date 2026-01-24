@@ -33,3 +33,4 @@ logs/
 Thumbs.db
 nul
 backup/
+local_processing/*.png
