@@ -137,11 +137,233 @@ class ConfirmStatsView(View):
         self.stop()
 
 
+class ValidateCaptureView(View):
+    """Vue pour valider ou refuser une capture analysee."""
+
+    def __init__(self, capture_id: int, timeout: float = 300):
+        super().__init__(timeout=timeout)
+        self.capture_id = capture_id
+        self.validated = None  # None = pas de reponse, True = valide, False = refuse
+
+    @discord.ui.button(label="Valider", style=ButtonStyle.success, emoji="✅")
+    async def validate_btn(self, interaction: discord.Interaction, button: Button):
+        self.validated = True
+        await interaction.response.defer()
+        self.stop()
+
+    @discord.ui.button(label="Refuser", style=ButtonStyle.danger, emoji="❌")
+    async def reject_btn(self, interaction: discord.Interaction, button: Button):
+        self.validated = False
+        await interaction.response.defer()
+        self.stop()
+
+
 class StatsCog(commands.Cog):
     """Commandes de capture et suivi des statistiques Tennis Clash."""
 
     def __init__(self, bot):
         self.bot = bot
+        self._notified_users = set()  # Pour eviter de notifier plusieurs fois par session
+
+    @commands.Cog.listener()
+    async def on_command(self, ctx):
+        """Verifie si l'utilisateur a des analyses pretes a chaque commande."""
+        # Eviter les boucles et les checks repetes
+        if ctx.author.id in self._notified_users:
+            return
+
+        try:
+            # Verifier s'il y a des captures completees pour cet utilisateur
+            completed = await CaptureQueue.get_completed_for_user(
+                self.bot.db_pool, ctx.author.id
+            )
+
+            if completed:
+                self._notified_users.add(ctx.author.id)
+                # Notifier pour chaque capture
+                for capture in completed:
+                    await self._notify_capture_ready(ctx.author, capture)
+
+        except Exception as e:
+            logger.error(f"Erreur check captures completees: {e}")
+
+    async def _notify_capture_ready(self, user: discord.User, capture: CaptureQueue):
+        """Notifie l'utilisateur qu'une capture a ete analysee et lui permet de valider.
+
+        Args:
+            user: Utilisateur a notifier
+            capture: Capture analysee
+        """
+        result = capture.result_json
+        if not result:
+            logger.warning(f"Capture {capture.id} completee mais sans result_json")
+            return
+
+        # Construire le preview des stats
+        stats = result.get("stats", {})
+        equipment = result.get("equipment", [])
+
+        preview_lines = [
+            f"**Personnage:** {result.get('character_name', '?')} (niv.{result.get('character_level', '?')})",
+            f"**Points:** {result.get('points', '?')}",
+            f"**Puissance:** {result.get('global_power', '?')}",
+            "",
+            f"**Stats:**",
+            f"  AGI: {stats.get('agility', '?')} | END: {stats.get('endurance', '?')}",
+            f"  SER: {stats.get('serve', '?')} | VOL: {stats.get('volley', '?')}",
+            f"  CD: {stats.get('forehand', '?')} | REV: {stats.get('backhand', '?')}",
+            "",
+            f"**Equipement:**",
+        ]
+
+        slot_names = {
+            1: "Raquette", 2: "Grip", 3: "Chaussures",
+            4: "Poignet", 5: "Nutrition", 6: "Entrainement"
+        }
+        for eq in equipment:
+            slot = eq.get("slot", 0)
+            slot_name = slot_names.get(slot, f"Slot {slot}")
+            preview_lines.append(
+                f"  {slot_name}: {eq.get('name', '?')} (niv.{eq.get('level', '?')})"
+            )
+
+        embed = discord.Embed(
+            title="Analyse terminee !",
+            description="\n".join(preview_lines),
+            color=discord.Color.green()
+        )
+        embed.set_footer(text=f"Capture #{capture.id} - Soumise le {capture.submitted_at.strftime('%d/%m %H:%M') if capture.submitted_at else '?'}")
+
+        # Envoyer avec boutons
+        view = ValidateCaptureView(capture.id)
+
+        try:
+            msg = await user.send(embed=embed, view=view)
+        except discord.Forbidden:
+            logger.warning(f"Impossible d'envoyer DM a {user.name}")
+            return
+
+        # Attendre la reponse
+        await view.wait()
+
+        if view.validated is True:
+            await self._validate_capture(user, capture, msg)
+        elif view.validated is False:
+            await self._reject_capture(capture, msg)
+        else:
+            # Timeout
+            await msg.edit(content="Temps ecoule. Tu peux refaire une commande pour revoir cette capture.", embed=embed, view=None)
+
+    async def _validate_capture(self, user: discord.User, capture: CaptureQueue, msg: discord.Message):
+        """Valide une capture et sauvegarde les stats.
+
+        Args:
+            user: Utilisateur qui valide
+            capture: Capture a valider
+            msg: Message a mettre a jour
+        """
+        result = capture.result_json
+
+        # Recuperer les joueurs du membre pour selection
+        players = await Player.get_by_member(self.bot.db_pool, user.name)
+
+        if not players:
+            await msg.edit(
+                content="Tu n'as pas de joueur enregistre. Contacte un Sage pour t'inscrire.",
+                embed=None, view=None
+            )
+            # Marquer comme rejete pour ne pas re-notifier
+            await capture.update_status(self.bot.db_pool, CaptureStatus.REJECTED)
+            return
+
+        # Selectionner le joueur
+        player_view = PlayerSelectView(players)
+        await msg.edit(content="Selectionne le joueur pour ces stats:", embed=None, view=player_view)
+
+        await player_view.wait()
+
+        if player_view.cancelled or player_view.selected_player is None:
+            await msg.edit(content="Validation annulee.", view=None)
+            return
+
+        selected_player_id = player_view.selected_player
+        selected_player = next((p for p in players if p.id == selected_player_id), None)
+
+        # Selectionner le build
+        build_view = BuildSelectView()
+        await msg.edit(content="Selectionne le type de build:", view=build_view)
+
+        await build_view.wait()
+
+        if build_view.cancelled or build_view.selected_build is None:
+            await msg.edit(content="Validation annulee.", view=None)
+            return
+
+        # Sauvegarder en base
+        try:
+            stats = result.get("stats", {})
+
+            saved_stats = await PlayerStats.create(
+                db_pool=self.bot.db_pool,
+                discord_id=user.id,
+                player_id=selected_player_id,
+                character_name=result.get("character_name") or "Inconnu",
+                points=result.get("points"),
+                global_power=result.get("global_power"),
+                agility=stats.get("agility"),
+                endurance=stats.get("endurance"),
+                serve=stats.get("serve"),
+                volley=stats.get("volley"),
+                forehand=stats.get("forehand"),
+                backhand=stats.get("backhand"),
+                build_type=build_view.selected_build
+            )
+
+            # Sauvegarder les equipements
+            equipment = result.get("equipment", [])
+            if equipment:
+                equipment_data = [
+                    {
+                        'slot': eq.get('slot'),
+                        'card_name': eq.get('name'),
+                        'card_level': eq.get('level')
+                    }
+                    for eq in equipment
+                    if eq.get('name') or eq.get('level')
+                ]
+                if equipment_data:
+                    await PlayerEquipment.create_many(
+                        self.bot.db_pool,
+                        saved_stats.id,
+                        equipment_data
+                    )
+
+            # Marquer comme valide
+            await capture.update_status(self.bot.db_pool, CaptureStatus.VALIDATED)
+
+            # Retirer de la liste des notifies pour permettre de nouvelles notifs
+            self._notified_users.discard(user.id)
+
+            await msg.edit(
+                content=f"Stats enregistrees pour **{result.get('character_name')}** ({selected_player.player_name if selected_player else '?'}) !",
+                view=None
+            )
+            logger.info(f"Capture {capture.id} validee par {user.name}")
+
+        except Exception as e:
+            logger.error(f"Erreur sauvegarde stats capture {capture.id}: {e}")
+            await msg.edit(content=f"Erreur lors de l'enregistrement: {e}", view=None)
+
+    async def _reject_capture(self, capture: CaptureQueue, msg: discord.Message):
+        """Refuse une capture.
+
+        Args:
+            capture: Capture a refuser
+            msg: Message a mettre a jour
+        """
+        await capture.update_status(self.bot.db_pool, CaptureStatus.REJECTED)
+        await msg.edit(content="Capture refusee et supprimee.", embed=None, view=None)
+        logger.info(f"Capture {capture.id} refusee")
 
     @commands.command(name="capture", aliases=["cap", "stats-capture"])
     async def capture_stats(self, ctx):
