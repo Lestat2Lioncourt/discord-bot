@@ -211,7 +211,8 @@ async def update_capture_completed(conn, capture_id: int, result_json: dict) -> 
             result_json = $1
         WHERE id = $2
     """
-    await conn.execute(query, json.dumps(result_json), capture_id)
+    # asyncpg gere automatiquement la serialisation JSONB, pas de json.dumps()
+    await conn.execute(query, result_json, capture_id)
 
 
 async def update_capture_failed(conn, capture_id: int, error: str) -> None:

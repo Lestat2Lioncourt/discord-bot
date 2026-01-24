@@ -102,6 +102,37 @@ class Player:
             ) for row in rows]
 
     @classmethod
+    async def get_by_id(cls, db_pool, player_id: int) -> Optional['Player']:
+        """Récupère un joueur par son ID.
+
+        Args:
+            db_pool: Pool de connexions asyncpg
+            player_id: ID du joueur
+
+        Returns:
+            Instance Player ou None si non trouvé
+        """
+        query = """
+        SELECT p.id, p.member_username, p.team_id, t.name as team_name,
+               p.player_name, p.created_at
+        FROM players p
+        LEFT JOIN teams t ON p.team_id = t.id
+        WHERE p.id = $1
+        """
+        async with db_pool.acquire() as conn:
+            row = await conn.fetchrow(query, player_id)
+            if not row:
+                return None
+            return cls(
+                id=row['id'],
+                member_username=row['member_username'],
+                team_id=row['team_id'],
+                team_name=row['team_name'],
+                player_name=row['player_name'],
+                created_at=row['created_at']
+            )
+
+    @classmethod
     async def get_by_members(cls, db_pool, usernames: List[str]) -> dict:
         """Récupère tous les joueurs pour plusieurs membres en une seule requête.
 

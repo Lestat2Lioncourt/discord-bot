@@ -35,7 +35,9 @@ class CaptureQueue:
         discord_user_id: ID Discord de l'utilisateur
         discord_username: @username Discord
         discord_display_name: Pseudo affiche
-        player_name: Nom du joueur TC (optionnel)
+        player_name: Nom du joueur TC (optionnel, legacy)
+        player_id: ID du joueur selectionne a la soumission
+        build_type: Type de build (main, tour1, etc.)
         image_data: Image en bytes
         image_filename: Nom du fichier original
         status: Statut de la capture
@@ -50,6 +52,8 @@ class CaptureQueue:
     discord_username: str
     discord_display_name: Optional[str] = None
     player_name: Optional[str] = None
+    player_id: Optional[int] = None
+    build_type: Optional[str] = None
     image_data: Optional[bytes] = None
     image_filename: Optional[str] = None
     status: str = CaptureStatus.PENDING
@@ -62,6 +66,8 @@ class CaptureQueue:
     @classmethod
     async def create(cls, db_pool, discord_user_id: int, discord_username: str,
                      image_data: bytes, discord_display_name: Optional[str] = None,
+                     player_id: Optional[int] = None,
+                     build_type: Optional[str] = None,
                      player_name: Optional[str] = None,
                      image_filename: Optional[str] = None) -> 'CaptureQueue':
         """Cree une nouvelle capture en file d'attente.
@@ -72,7 +78,9 @@ class CaptureQueue:
             discord_username: @username Discord
             image_data: Image en bytes
             discord_display_name: Pseudo affiche
-            player_name: Nom du joueur TC
+            player_id: ID du joueur selectionne
+            build_type: Type de build (main, tour1, etc.)
+            player_name: Nom du joueur TC (legacy)
             image_filename: Nom du fichier original
 
         Returns:
@@ -81,8 +89,8 @@ class CaptureQueue:
         query = """
             INSERT INTO capture_queue
                 (discord_user_id, discord_username, discord_display_name,
-                 player_name, image_data, image_filename, status)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
+                 player_id, build_type, player_name, image_data, image_filename, status)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             RETURNING id, submitted_at
         """
         async with db_pool.acquire() as conn:
@@ -91,19 +99,23 @@ class CaptureQueue:
                 discord_user_id,
                 discord_username,
                 discord_display_name,
+                player_id,
+                build_type,
                 player_name,
                 image_data,
                 image_filename,
                 CaptureStatus.PENDING
             )
 
-        logger.info(f"Capture creee id={row['id']} pour {discord_username}")
+        logger.info(f"Capture creee id={row['id']} pour {discord_username} (player_id={player_id}, build={build_type})")
 
         return cls(
             id=row['id'],
             discord_user_id=discord_user_id,
             discord_username=discord_username,
             discord_display_name=discord_display_name,
+            player_id=player_id,
+            build_type=build_type,
             player_name=player_name,
             image_data=image_data,
             image_filename=image_filename,
@@ -222,7 +234,7 @@ class CaptureQueue:
             await conn.execute(
                 query,
                 new_status,
-                json.dumps(result_json) if result_json else None,
+                result_json,  # asyncpg gere automatiquement JSONB
                 error_message,
                 self.id
             )
@@ -267,6 +279,8 @@ class CaptureQueue:
             discord_username=row['discord_username'],
             discord_display_name=row['discord_display_name'],
             player_name=row['player_name'],
+            player_id=row.get('player_id'),
+            build_type=row.get('build_type'),
             image_data=row['image_data'],
             image_filename=row['image_filename'],
             status=row['status'],

@@ -191,6 +191,41 @@ class PlayerStats:
             return [cls._from_row(row) for row in rows]
 
     @classmethod
+    async def get_summary_by_character(cls, db_pool) -> List[dict]:
+        """Recupere un resume des captures par personnage.
+
+        Returns:
+            Liste de dicts avec character_name, capture_count, player_count
+            triee par nombre de captures decroissant
+        """
+        query = """
+        SELECT
+            character_name,
+            COUNT(*) as capture_count,
+            COUNT(DISTINCT player_id) as player_count
+        FROM player_stats
+        GROUP BY character_name
+        ORDER BY capture_count DESC
+        """
+        async with db_pool.acquire() as conn:
+            rows = await conn.fetch(query)
+            return [
+                {
+                    'character_name': row['character_name'],
+                    'capture_count': row['capture_count'],
+                    'player_count': row['player_count']
+                }
+                for row in rows
+            ]
+
+    @classmethod
+    async def get_total_count(cls, db_pool) -> int:
+        """Compte le nombre total de captures."""
+        query = "SELECT COUNT(*) FROM player_stats"
+        async with db_pool.acquire() as conn:
+            return await conn.fetchval(query)
+
+    @classmethod
     async def get_latest_by_player(cls, db_pool, player_id: int) -> Optional['PlayerStats']:
         """Recupere les dernieres stats d'un joueur in-game.
 
@@ -213,6 +248,60 @@ class PlayerStats:
         async with db_pool.acquire() as conn:
             row = await conn.fetchrow(query, player_id)
             return cls._from_row(row) if row else None
+
+    @classmethod
+    async def get_latest_for_build(cls, db_pool, player_id: int,
+                                    character_name: str, build_type: str) -> Optional['PlayerStats']:
+        """Recupere les dernieres stats pour un joueur/personnage/build.
+
+        Args:
+            db_pool: Pool de connexions asyncpg
+            player_id: ID du joueur in-game
+            character_name: Nom du personnage
+            build_type: Type de build
+
+        Returns:
+            Dernieres PlayerStats ou None
+        """
+        query = """
+        SELECT id, discord_id, player_id, character_name, points, global_power,
+               agility, endurance, serve, volley, forehand, backhand,
+               build_type, comment, captured_at
+        FROM player_stats
+        WHERE player_id = $1
+          AND LOWER(character_name) = LOWER($2)
+          AND build_type = $3
+        ORDER BY captured_at DESC
+        LIMIT 1
+        """
+        async with db_pool.acquire() as conn:
+            row = await conn.fetchrow(query, player_id, character_name, build_type)
+            return cls._from_row(row) if row else None
+
+    def is_same_as(self, other: 'PlayerStats') -> bool:
+        """Compare les valeurs de stats avec une autre instance.
+
+        Compare points, global_power et les 6 stats principales.
+
+        Args:
+            other: Autre instance PlayerStats a comparer
+
+        Returns:
+            True si les valeurs sont identiques
+        """
+        if not other:
+            return False
+
+        return (
+            self.points == other.points and
+            self.global_power == other.global_power and
+            self.agility == other.agility and
+            self.endurance == other.endurance and
+            self.serve == other.serve and
+            self.volley == other.volley and
+            self.forehand == other.forehand and
+            self.backhand == other.backhand
+        )
 
     @classmethod
     async def delete(cls, db_pool, stats_id: int, discord_id: int) -> bool:

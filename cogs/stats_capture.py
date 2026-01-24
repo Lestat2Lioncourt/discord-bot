@@ -14,6 +14,8 @@ Flow de !capture (asynchrone):
 5. User est notifie et peut valider/refuser les resultats
 """
 
+import asyncio
+
 import discord
 from discord.ext import commands, tasks
 from discord import ButtonStyle, SelectOption
@@ -168,6 +170,8 @@ class StatsCog(commands.Cog):
     async def cog_load(self):
         """Demarre la tache de check des analyses."""
         self.check_completed_captures.start()
+        # Lancer un check immediat au demarrage (apres que le bot soit pret)
+        asyncio.create_task(self._initial_capture_check())
 
     async def cog_unload(self):
         """Arrete la tache de check des analyses."""
@@ -221,6 +225,14 @@ class StatsCog(commands.Cog):
         """Attend que le bot soit pret avant de demarrer la tache."""
         await self.bot.wait_until_ready()
 
+    async def _initial_capture_check(self):
+        """Check immediat au demarrage du bot."""
+        await self.bot.wait_until_ready()
+        # Petit delai pour laisser le temps aux autres cogs de se charger
+        await asyncio.sleep(2)
+        logger.info("Check initial des captures en attente...")
+        await self.check_completed_captures()
+
     async def _notify_capture_ready(self, user: discord.User, capture: CaptureQueue):
         """Notifie l'utilisateur qu'une capture a ete analysee et lui permet de valider.
 
@@ -237,7 +249,13 @@ class StatsCog(commands.Cog):
         stats = result.get("stats", {})
         equipment = result.get("equipment", [])
 
+        # Afficher joueur et build selectionnes a la soumission
+        player_info = capture.player_name or "?"
+        build_info = capture.build_type or "?"
+
         preview_lines = [
+            f"**Joueur:** {player_info} | **Build:** {build_info}",
+            "",
             f"**Personnage:** {result.get('character_name', '?')} (niv.{result.get('character_level', '?')})",
             f"**Points:** {result.get('points', '?')}",
             f"**Puissance:** {result.get('global_power', '?')}",
@@ -291,6 +309,121 @@ class StatsCog(commands.Cog):
     async def _validate_capture(self, user: discord.User, capture: CaptureQueue, msg: discord.Message):
         """Valide une capture et sauvegarde les stats.
 
+        Le joueur et build ont ete selectionnes a la soumission.
+
+        Args:
+            user: Utilisateur qui valide
+            capture: Capture a valider
+            msg: Message a mettre a jour
+        """
+        result = capture.result_json
+
+        # Verifier que player_id et build_type sont definis
+        if not capture.player_id or not capture.build_type:
+            # Fallback pour les anciennes captures sans player_id/build_type
+            await self._validate_capture_legacy(user, capture, msg)
+            return
+
+        # Sauvegarder en base directement avec le joueur/build selectionnes a la soumission
+        try:
+            stats = result.get("stats", {})
+            character_name = result.get("character_name") or "Inconnu"
+
+            # Verifier si les stats sont identiques a la derniere capture
+            last_stats = await PlayerStats.get_latest_for_build(
+                self.bot.db_pool,
+                capture.player_id,
+                character_name,
+                capture.build_type
+            )
+
+            # Creer un objet temporaire pour comparer
+            new_stats = PlayerStats(
+                id=None,
+                discord_id=user.id,
+                player_id=capture.player_id,
+                character_name=character_name,
+                points=result.get("points"),
+                global_power=result.get("global_power"),
+                agility=stats.get("agility"),
+                endurance=stats.get("endurance"),
+                serve=stats.get("serve"),
+                volley=stats.get("volley"),
+                forehand=stats.get("forehand"),
+                backhand=stats.get("backhand"),
+                build_type=capture.build_type
+            )
+
+            if last_stats and new_stats.is_same_as(last_stats):
+                # Stats identiques - ne pas inserer
+                await capture.update_status(self.bot.db_pool, CaptureStatus.VALIDATED)
+                self._notified_captures.discard(capture.id)
+
+                last_date = last_stats.captured_at.strftime("%d/%m/%Y") if last_stats.captured_at else "?"
+                await msg.edit(
+                    content=f"Pas de changement pour **{character_name}** ({capture.player_name or '?'}, {capture.build_type}) depuis le {last_date}.\nCapture ignoree.",
+                    view=None
+                )
+                logger.info(f"Capture {capture.id} ignoree (identique) par {user.name}")
+                return
+
+            # Stats differentes - inserer
+            saved_stats = await PlayerStats.create(
+                db_pool=self.bot.db_pool,
+                discord_id=user.id,
+                player_id=capture.player_id,
+                character_name=character_name,
+                points=result.get("points"),
+                global_power=result.get("global_power"),
+                agility=stats.get("agility"),
+                endurance=stats.get("endurance"),
+                serve=stats.get("serve"),
+                volley=stats.get("volley"),
+                forehand=stats.get("forehand"),
+                backhand=stats.get("backhand"),
+                build_type=capture.build_type
+            )
+
+            # Sauvegarder les equipements
+            equipment = result.get("equipment", [])
+            if equipment:
+                equipment_data = [
+                    {
+                        'slot': eq.get('slot'),
+                        'card_name': eq.get('name'),
+                        'card_level': eq.get('level')
+                    }
+                    for eq in equipment
+                    if eq.get('name') or eq.get('level')
+                ]
+                if equipment_data:
+                    await PlayerEquipment.create_many(
+                        self.bot.db_pool,
+                        saved_stats.id,
+                        equipment_data
+                    )
+
+            # Marquer comme valide
+            await capture.update_status(self.bot.db_pool, CaptureStatus.VALIDATED)
+
+            # Retirer de la liste des captures notifiees
+            self._notified_captures.discard(capture.id)
+
+            await msg.edit(
+                content=f"Stats enregistrees pour **{character_name}** ({capture.player_name or '?'}, {capture.build_type}) !",
+                view=None
+            )
+            logger.info(f"Capture {capture.id} validee par {user.name}")
+
+        except Exception as e:
+            logger.error(f"Erreur sauvegarde stats capture {capture.id}: {e}")
+            await msg.edit(content=f"Erreur lors de l'enregistrement: {e}", view=None)
+
+    async def _validate_capture_legacy(self, user: discord.User, capture: CaptureQueue, msg: discord.Message):
+        """Valide une capture sans player_id/build_type (anciennes captures).
+
+        Demande le joueur et build a l'utilisateur.
+
         Args:
             user: Utilisateur qui valide
             capture: Capture a valider
@@ -306,7 +439,6 @@ class StatsCog(commands.Cog):
                 content="Tu n'as pas de joueur enregistre. Contacte un Sage pour t'inscrire.",
                 embed=None, view=None
             )
-            # Marquer comme rejete pour ne pas re-notifier
             await capture.update_status(self.bot.db_pool, CaptureStatus.REJECTED)
             return
 
@@ -336,12 +468,23 @@ class StatsCog(commands.Cog):
         # Sauvegarder en base
         try:
             stats = result.get("stats", {})
+            character_name = result.get("character_name") or "Inconnu"
+            selected_build = build_view.selected_build
 
-            saved_stats = await PlayerStats.create(
-                db_pool=self.bot.db_pool,
+            # Verifier si les stats sont identiques a la derniere capture
+            last_stats = await PlayerStats.get_latest_for_build(
+                self.bot.db_pool,
+                selected_player_id,
+                character_name,
+                selected_build
+            )
+
+            # Creer un objet temporaire pour comparer
+            new_stats = PlayerStats(
+                id=None,
                 discord_id=user.id,
                 player_id=selected_player_id,
-                character_name=result.get("character_name") or "Inconnu",
+                character_name=character_name,
                 points=result.get("points"),
                 global_power=result.get("global_power"),
                 agility=stats.get("agility"),
@@ -350,7 +493,37 @@ class StatsCog(commands.Cog):
                 volley=stats.get("volley"),
                 forehand=stats.get("forehand"),
                 backhand=stats.get("backhand"),
-                build_type=build_view.selected_build
+                build_type=selected_build
+            )
+
+            if last_stats and new_stats.is_same_as(last_stats):
+                # Stats identiques - ne pas inserer
+                await capture.update_status(self.bot.db_pool, CaptureStatus.VALIDATED)
+                self._notified_captures.discard(capture.id)
+
+                last_date = last_stats.captured_at.strftime("%d/%m/%Y") if last_stats.captured_at else "?"
+                await msg.edit(
+                    content=f"Pas de changement pour **{character_name}** ({selected_player.player_name if selected_player else '?'}, {selected_build}) depuis le {last_date}.\nCapture ignoree.",
+                    view=None
+                )
+                logger.info(f"Capture {capture.id} ignoree (identique, legacy) par {user.name}")
+                return
+
+            # Stats differentes - inserer
+            saved_stats = await PlayerStats.create(
+                db_pool=self.bot.db_pool,
+                discord_id=user.id,
+                player_id=selected_player_id,
+                character_name=character_name,
+                points=result.get("points"),
+                global_power=result.get("global_power"),
+                agility=stats.get("agility"),
+                endurance=stats.get("endurance"),
+                serve=stats.get("serve"),
+                volley=stats.get("volley"),
+                forehand=stats.get("forehand"),
+                backhand=stats.get("backhand"),
+                build_type=selected_build
             )
 
             # Sauvegarder les equipements
@@ -374,15 +547,13 @@ class StatsCog(commands.Cog):
 
             # Marquer comme valide
             await capture.update_status(self.bot.db_pool, CaptureStatus.VALIDATED)
-
-            # Retirer de la liste des captures notifiees
             self._notified_captures.discard(capture.id)
 
             await msg.edit(
-                content=f"Stats enregistrees pour **{result.get('character_name')}** ({selected_player.player_name if selected_player else '?'}) !",
+                content=f"Stats enregistrees pour **{character_name}** ({selected_player.player_name if selected_player else '?'}, {selected_build}) !",
                 view=None
             )
-            logger.info(f"Capture {capture.id} validee par {user.name}")
+            logger.info(f"Capture {capture.id} validee (legacy) par {user.name}")
 
         except Exception as e:
             logger.error(f"Erreur sauvegarde stats capture {capture.id}: {e}")
@@ -423,8 +594,53 @@ class StatsCog(commands.Cog):
             await reply_dm(ctx, get_text("stats.invalid_image", lang))
             return
 
-        # Message immediat
-        await reply_dm(ctx, "Transmission au moteur IA en cours...")
+        # Recuperer les joueurs du membre
+        players = await Player.get_by_member(self.bot.db_pool, ctx.author.name)
+
+        if not players:
+            await reply_dm(
+                ctx,
+                "Tu n'as pas de joueur enregistre. Contacte un Sage pour t'inscrire."
+            )
+            return
+
+        # Selection du joueur
+        selected_player = None
+        if len(players) == 1:
+            # Auto-selection si un seul joueur
+            selected_player = players[0]
+            await reply_dm(ctx, f"Joueur: **{selected_player.player_name}** (auto)")
+        else:
+            # Afficher le menu de selection
+            player_view = PlayerSelectView(players)
+            msg = await reply_dm(ctx, "Selectionne le joueur pour cette capture:", view=player_view)
+
+            await player_view.wait()
+
+            if player_view.cancelled or player_view.selected_player is None:
+                await reply_dm(ctx, "Capture annulee.")
+                return
+
+            selected_player = next((p for p in players if p.id == player_view.selected_player), None)
+
+        # Selection du build
+        build_view = BuildSelectView()
+        await reply_dm(ctx, f"Joueur: **{selected_player.player_name}**\nSelectionne le type de build:", view=build_view)
+
+        await build_view.wait()
+
+        if build_view.cancelled or build_view.selected_build is None:
+            await reply_dm(ctx, "Capture annulee.")
+            return
+
+        selected_build = build_view.selected_build
+
+        # Message de confirmation
+        await reply_dm(
+            ctx,
+            f"Joueur: **{selected_player.player_name}** | Build: **{selected_build}**\n"
+            f"Transmission au moteur IA en cours..."
+        )
 
         # Telecharger l'image en memoire (bytes)
         try:
@@ -434,13 +650,16 @@ class StatsCog(commands.Cog):
             await reply_dm(ctx, get_text("stats.download_error", lang))
             return
 
-        # Stocker en file d'attente
+        # Stocker en file d'attente avec joueur et build
         try:
             capture = await CaptureQueue.create(
                 db_pool=self.bot.db_pool,
                 discord_user_id=ctx.author.id,
                 discord_username=ctx.author.name,
                 discord_display_name=ctx.author.display_name,
+                player_id=selected_player.id,
+                build_type=selected_build,
+                player_name=selected_player.player_name,
                 image_data=image_data,
                 image_filename=attachment.filename
             )
@@ -451,26 +670,30 @@ class StatsCog(commands.Cog):
             # Repondre a l'utilisateur
             await reply_dm(
                 ctx,
-                f"Image enregistree, tu seras notifie quand elle aura ete traitee.\n"
+                f"Image enregistree pour **{selected_player.player_name}** ({selected_build}).\n"
+                f"Tu seras notifie quand elle aura ete traitee.\n"
                 f"(Position dans la file: {pending_count})"
             )
 
-            logger.info(f"Capture {capture.id} enregistree pour {ctx.author.name}")
+            logger.info(f"Capture {capture.id} enregistree pour {ctx.author.name} (player={selected_player.player_name}, build={selected_build})")
 
             # Notifier l'admin
-            await self._notify_admin_new_capture(ctx.author, capture.id, pending_count)
+            await self._notify_admin_new_capture(ctx.author, capture.id, pending_count, selected_player.player_name, selected_build)
 
         except Exception as e:
             logger.error(f"Erreur enregistrement capture: {e}")
             await reply_dm(ctx, get_text("stats.save_error", lang))
 
-    async def _notify_admin_new_capture(self, user: discord.User, capture_id: int, pending_count: int):
+    async def _notify_admin_new_capture(self, user: discord.User, capture_id: int, pending_count: int,
+                                         player_name: str = None, build_type: str = None):
         """Notifie l'admin qu'une nouvelle capture est en attente.
 
         Args:
             user: Utilisateur qui a soumis la capture
             capture_id: ID de la capture
             pending_count: Nombre total de captures en attente
+            player_name: Nom du joueur selectionne
+            build_type: Type de build selectionne
         """
         try:
             # Trouver l'admin par son nom (DEBUG_USER)
@@ -488,13 +711,19 @@ class StatsCog(commands.Cog):
                 return
 
             # Envoyer le DM
+            desc_lines = [
+                f"**De:** {user.display_name} (@{user.name})",
+                f"**Capture ID:** {capture_id}",
+            ]
+            if player_name:
+                desc_lines.append(f"**Joueur:** {player_name}")
+            if build_type:
+                desc_lines.append(f"**Build:** {build_type}")
+            desc_lines.append(f"**En attente:** {pending_count} image(s)")
+
             embed = discord.Embed(
                 title="Nouvelle capture en attente",
-                description=(
-                    f"**De:** {user.display_name} (@{user.name})\n"
-                    f"**Capture ID:** {capture_id}\n"
-                    f"**En attente:** {pending_count} image(s)"
-                ),
+                description="\n".join(desc_lines),
                 color=discord.Color.blue()
             )
             embed.set_footer(text="Lance process_queue.py pour traiter")
@@ -617,6 +846,104 @@ class StatsCog(commands.Cog):
                 value=value,
                 inline=False
             )
+
+        await reply_dm(ctx, embed=embed)
+
+    @commands.command(name="captures", aliases=["stats-list"])
+    async def list_captures(self, ctx, *, character_name: str = None):
+        """Affiche un resume des captures enregistrees.
+
+        Usage:
+            !captures           - Resume par personnage
+            !captures Mei-Li    - Detail pour un personnage
+        """
+        if character_name:
+            await self._show_character_detail(ctx, character_name)
+        else:
+            await self._show_captures_summary(ctx)
+
+    async def _show_captures_summary(self, ctx):
+        """Affiche le resume des captures par personnage."""
+        summary = await PlayerStats.get_summary_by_character(self.bot.db_pool)
+        total = await PlayerStats.get_total_count(self.bot.db_pool)
+
+        if not summary:
+            await reply_dm(ctx, "Aucune capture enregistree.")
+            return
+
+        # Construire l'embed
+        embed = discord.Embed(
+            title="Captures enregistrees",
+            description=f"**{total}** captures au total",
+            color=discord.Color.blue()
+        )
+
+        # Formater la liste
+        lines = []
+        for item in summary[:15]:  # Max 15 personnages
+            char = item['character_name']
+            count = item['capture_count']
+            players = item['player_count']
+            lines.append(f"**{char}**: {count} capture(s) ({players} joueur(s))")
+
+        if len(summary) > 15:
+            lines.append(f"... et {len(summary) - 15} autre(s)")
+
+        embed.add_field(
+            name="Par personnage",
+            value="\n".join(lines),
+            inline=False
+        )
+
+        embed.set_footer(text="Utilise !captures <personnage> pour le detail")
+
+        await reply_dm(ctx, embed=embed)
+
+    async def _show_character_detail(self, ctx, character_name: str):
+        """Affiche le detail des captures pour un personnage."""
+        all_stats = await PlayerStats.get_all_for_character(self.bot.db_pool, character_name)
+
+        if not all_stats:
+            await reply_dm(ctx, f"Aucune capture pour **{character_name}**.")
+            return
+
+        # Grouper par player_id
+        by_player = {}
+        for stat in all_stats:
+            if stat.player_id not in by_player:
+                by_player[stat.player_id] = []
+            by_player[stat.player_id].append(stat)
+
+        embed = discord.Embed(
+            title=f"Captures - {character_name}",
+            description=f"**{len(all_stats)}** capture(s) par **{len(by_player)}** joueur(s)",
+            color=discord.Color.blue()
+        )
+
+        # Afficher par joueur (derniere capture)
+        for player_id, stats in list(by_player.items())[:10]:
+            latest = stats[0]  # Deja trie par date desc
+
+            # Recuperer le nom du joueur
+            player = await Player.get_by_id(self.bot.db_pool, player_id)
+            player_name = player.player_name if player else f"ID:{player_id}"
+
+            # Infos
+            date_str = latest.captured_at.strftime("%d/%m/%Y") if latest.captured_at else "?"
+            value = (
+                f"Puissance: **{latest.global_power or '?'}** | Points: {latest.points or '?'}\n"
+                f"Build: {latest.build_type or '?'} | {len(stats)} capture(s)\n"
+                f"Derniere: {date_str}"
+            )
+
+            embed.add_field(
+                name=player_name,
+                value=value,
+                inline=True
+            )
+
+        if len(by_player) > 10:
+            embed.set_footer(text=f"... et {len(by_player) - 10} autre(s) joueur(s)")
 
         await reply_dm(ctx, embed=embed)
 

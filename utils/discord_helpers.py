@@ -18,8 +18,9 @@ async def reply_dm(
     *,
     embed: discord.Embed = None,
     file: discord.File = None,
+    view: discord.ui.View = None,
     silent: bool = False
-) -> bool:
+) -> Union[discord.Message, bool]:
     """
     Repond en DM a l'utilisateur. Si appele depuis un salon, notifie.
 
@@ -28,10 +29,11 @@ async def reply_dm(
         content: Message texte (optionnel)
         embed: Embed Discord (optionnel)
         file: Fichier a envoyer (optionnel)
+        view: View Discord avec boutons/selects (optionnel)
         silent: Si True, ne pas notifier dans le salon d'origine
 
     Returns:
-        True si le DM a ete envoye, False si echec
+        Message envoye si succes, False si echec
     """
     try:
         # Preparer les kwargs
@@ -42,15 +44,17 @@ async def reply_dm(
             kwargs["embed"] = embed
         if file:
             kwargs["file"] = file
+        if view:
+            kwargs["view"] = view
 
         # Envoyer en DM
-        await ctx.author.send(**kwargs)
+        msg = await ctx.author.send(**kwargs)
 
         # Si on etait dans un salon public, notifier (sauf si silent)
         if ctx.guild and not silent:
-            await ctx.send("📬 Reponse envoyee en DM.")
+            await ctx.send("Reponse envoyee en DM.")
 
-        return True
+        return msg
 
     except discord.Forbidden:
         # DMs fermes - envoyer dans le salon
@@ -62,6 +66,8 @@ async def reply_dm(
             kwargs["embed"] = embed
         if file:
             kwargs["file"] = file
+        if view:
+            kwargs["view"] = view
         await ctx.send(**kwargs)
         return False
 
