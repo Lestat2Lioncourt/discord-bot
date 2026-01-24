@@ -2,17 +2,16 @@
 Cog pour la capture et le suivi des statistiques Tennis Clash.
 
 Commandes:
-- !capture: Analyse une capture d'ecran et enregistre les stats
+- !capture: Soumet une capture d'ecran pour analyse (traitement asynchrone)
 - !evolution: Affiche l'evolution d'un personnage
 - !compare: Compare un personnage entre joueurs
 
-Flow de !capture:
+Flow de !capture (asynchrone):
 1. User envoie une image
-2. OCR extrait les stats
-3. Bot affiche preview et demande confirmation
-4. User selectionne son joueur (team 1 ou 2)
-5. User selectionne le type de build
-6. Stats enregistrees en base
+2. Bot stocke l'image en file d'attente (capture_queue)
+3. User recoit confirmation "Image enregistree, tu seras notifie..."
+4. Script local (machine admin) traite les images avec Claude Vision
+5. User est notifie et peut valider/refuser les resultats
 """
 
 import discord
@@ -27,11 +26,12 @@ from models.player import Player
 from models.player_stats import PlayerStats
 from models.player_equipment import PlayerEquipment
 from models.user_profile import UserProfile
+from models.capture_queue import CaptureQueue, CaptureStatus
 from utils.image_processing import extract_stats_v2, format_stats_preview, ExtractedStats
 from utils.discord_helpers import reply_dm
 from utils.logger import get_logger
 from utils.i18n import get_text
-from config import TEMP_DIR
+from config import TEMP_DIR, DEBUG_USER
 
 logger = get_logger("cogs.stats_capture")
 
@@ -145,7 +145,10 @@ class StatsCog(commands.Cog):
 
     @commands.command(name="capture", aliases=["cap", "stats-capture"])
     async def capture_stats(self, ctx):
-        """Analyse une capture d'ecran Tennis Clash et enregistre les stats.
+        """Soumet une capture d'ecran Tennis Clash pour analyse.
+
+        L'image est mise en file d'attente et sera traitee par Claude Vision.
+        Tu seras notifie quand l'analyse sera terminee.
 
         Usage: Envoie une image avec la commande !capture
         """
@@ -163,137 +166,86 @@ class StatsCog(commands.Cog):
             await reply_dm(ctx, get_text("stats.invalid_image", lang))
             return
 
-        # Message immediat pour feedback utilisateur
-        await ctx.author.send(get_text("stats.analyzing", lang))
-
-        # Telecharger l'image
-        image_path = TEMP_DIR / f"capture_{ctx.author.id}_{attachment.filename}"
+        # Telecharger l'image en memoire (bytes)
         try:
-            await attachment.save(str(image_path))
+            image_data = await attachment.read()
         except discord.HTTPException as e:
             logger.error(f"Erreur telechargement image: {e}")
             await reply_dm(ctx, get_text("stats.download_error", lang))
             return
 
-        # Extraire les stats
-        stats = extract_stats_v2(str(image_path))
-
-        # Nettoyer l'image temporaire
-        if os.path.exists(image_path):
-            os.remove(image_path)
-
-        # Afficher le preview
-        preview = format_stats_preview(stats, lang)
-        embed = discord.Embed(
-            title=get_text("stats.preview_title", lang),
-            description=preview,
-            color=discord.Color.blue() if stats.confidence >= 0.5 else discord.Color.orange()
-        )
-
-        if stats.warnings:
-            warnings_text = "\n".join(f"- {w}" for w in stats.warnings[:5])
-            embed.add_field(name=get_text("stats.warnings", lang), value=warnings_text, inline=False)
-
-        # Vue de confirmation
-        confirm_view = ConfirmStatsView()
-        msg = await ctx.author.send(embed=embed, view=confirm_view)
-
-        await confirm_view.wait()
-
-        if confirm_view.cancelled or not confirm_view.confirmed:
-            await msg.edit(content=get_text("stats.cancelled", lang), embed=None, view=None)
-            return
-
-        # Recuperer les joueurs du membre
-        players = await Player.get_by_member(self.bot.db_pool, ctx.author.name)
-
-        if not players:
-            await msg.edit(
-                content=get_text("stats.no_players", lang),
-                embed=None, view=None
-            )
-            return
-
-        # Selectionner le joueur
-        player_view = PlayerSelectView(players)
-        await msg.edit(
-            content=get_text("stats.select_player", lang),
-            embed=None, view=player_view
-        )
-
-        await player_view.wait()
-
-        if player_view.cancelled or player_view.selected_player is None:
-            await msg.edit(content=get_text("stats.cancelled", lang), view=None)
-            return
-
-        selected_player_id = player_view.selected_player
-        selected_player = next((p for p in players if p.id == selected_player_id), None)
-
-        # Selectionner le build
-        build_view = BuildSelectView()
-        await msg.edit(
-            content=get_text("stats.select_build", lang),
-            view=build_view
-        )
-
-        await build_view.wait()
-
-        if build_view.cancelled or build_view.selected_build is None:
-            await msg.edit(content=get_text("stats.cancelled", lang), view=None)
-            return
-
-        # Enregistrer en base
+        # Stocker en file d'attente
         try:
-            # Sauvegarder les stats
-            saved_stats = await PlayerStats.create(
+            capture = await CaptureQueue.create(
                 db_pool=self.bot.db_pool,
-                discord_id=ctx.author.id,
-                player_id=selected_player_id,
-                character_name=stats.character_name or "Inconnu",
-                points=stats.points,
-                global_power=stats.global_power,
-                agility=stats.agility,
-                endurance=stats.endurance,
-                serve=stats.serve,
-                volley=stats.volley,
-                forehand=stats.forehand,
-                backhand=stats.backhand,
-                build_type=build_view.selected_build
+                discord_user_id=ctx.author.id,
+                discord_username=ctx.author.name,
+                discord_display_name=ctx.author.display_name,
+                image_data=image_data,
+                image_filename=attachment.filename
             )
 
-            # Sauvegarder les equipements
-            if stats.equipment:
-                equipment_data = [
-                    {
-                        'slot': eq.slot,
-                        'card_name': eq.card_name,
-                        'card_level': eq.card_level
-                    }
-                    for eq in stats.equipment
-                    if eq.card_name or eq.card_level  # Seulement si au moins une donnee
-                ]
-                if equipment_data:
-                    await PlayerEquipment.create_many(
-                        self.bot.db_pool,
-                        saved_stats.id,
-                        equipment_data
-                    )
+            # Compter les captures en attente
+            pending_count = await CaptureQueue.count_pending(self.bot.db_pool)
 
-            success_embed = discord.Embed(
-                title=get_text("stats.saved_title", lang),
-                description=get_text("stats.saved_desc", lang).format(
-                    character=stats.character_name,
-                    player=selected_player.player_name if selected_player else "?"
-                ),
-                color=discord.Color.green()
+            # Repondre a l'utilisateur
+            await reply_dm(
+                ctx,
+                f"Image enregistree, tu seras notifie quand elle aura ete traitee.\n"
+                f"(Position dans la file: {pending_count})"
             )
-            await msg.edit(embed=success_embed, view=None)
-            logger.info(f"Stats enregistrees: {stats.character_name} pour {ctx.author.name}")
+
+            logger.info(f"Capture {capture.id} enregistree pour {ctx.author.name}")
+
+            # Notifier l'admin
+            await self._notify_admin_new_capture(ctx.author, capture.id, pending_count)
 
         except Exception as e:
-            logger.error(f"Erreur enregistrement stats: {e}")
-            await msg.edit(content=get_text("stats.save_error", lang), view=None)
+            logger.error(f"Erreur enregistrement capture: {e}")
+            await reply_dm(ctx, get_text("stats.save_error", lang))
+
+    async def _notify_admin_new_capture(self, user: discord.User, capture_id: int, pending_count: int):
+        """Notifie l'admin qu'une nouvelle capture est en attente.
+
+        Args:
+            user: Utilisateur qui a soumis la capture
+            capture_id: ID de la capture
+            pending_count: Nombre total de captures en attente
+        """
+        try:
+            # Trouver l'admin par son nom (DEBUG_USER)
+            admin = None
+            for guild in self.bot.guilds:
+                admin = discord.utils.find(
+                    lambda m: m.name.lower() == DEBUG_USER.lower(),
+                    guild.members
+                )
+                if admin:
+                    break
+
+            if not admin:
+                logger.warning(f"Admin {DEBUG_USER} non trouve pour notification")
+                return
+
+            # Envoyer le DM
+            embed = discord.Embed(
+                title="Nouvelle capture en attente",
+                description=(
+                    f"**De:** {user.display_name} (@{user.name})\n"
+                    f"**Capture ID:** {capture_id}\n"
+                    f"**En attente:** {pending_count} image(s)"
+                ),
+                color=discord.Color.blue()
+            )
+            embed.set_footer(text="Lance process_queue.py pour traiter")
+
+            await admin.send(embed=embed)
+            logger.info(f"Notification envoyee a {DEBUG_USER} pour capture {capture_id}")
+
+        except discord.Forbidden:
+            logger.warning(f"Impossible d'envoyer DM a {DEBUG_USER}")
+        except Exception as e:
+            logger.error(f"Erreur notification admin: {e}")
 
     @commands.command(name="evolution", aliases=["evo", "history"])
     async def show_evolution(self, ctx, *, character_name: str = None):
