@@ -6,9 +6,9 @@ Bot Discord pour la team **This Is PSG** sur Tennis Clash.
 
 | Métrique | Valeur |
 |----------|--------|
-| **Version** | 1.1.0 |
-| **Lignes de code** | 9 336 |
-| **Fichiers Python** | 47 |
+| **Version** | 2.0.0 |
+| **Lignes de code** | 12 701 |
+| **Fichiers Python** | 53 |
 | **Commandes** | 26 |
 | **Tests automatisés** | 196 |
 | **Langues** | FR, EN |
