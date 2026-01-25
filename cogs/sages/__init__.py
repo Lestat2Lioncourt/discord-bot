@@ -556,6 +556,10 @@ class SagesCog(commands.Cog):
             # Retrograder en Newbie si necessaire
             await demote_to_newbie(member)
 
+            # Reset le rate limiter pour permettre !inscription
+            from utils.rate_limit import inscription_limiter
+            inscription_limiter.reset(member.id)
+
         msg = f"**{member.display_name}** reinitialise :\n"
         msg += f"* Statut : pending\n"
         msg += f"* Charte : non validee\n"
