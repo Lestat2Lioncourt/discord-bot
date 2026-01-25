@@ -249,6 +249,36 @@ async def custom_help(ctx, command_name: str = None):
             "usage": "!stats",
             "aliases": "!statistiques, !dashboard"
         },
+        "capture": {
+            "desc_fr": "Soumet une capture d'ecran Tennis Clash pour analyse IA.",
+            "desc_en": "Submit a Tennis Clash screenshot for AI analysis.",
+            "usage": "!capture + image jointe",
+            "aliases": "!cap"
+        },
+        "captures": {
+            "desc_fr": "Liste tes captures enregistrees par personnage.",
+            "desc_en": "List your recorded captures by character.",
+            "usage": "!captures [personnage]",
+            "aliases": "!stats-list"
+        },
+        "evolution": {
+            "desc_fr": "Affiche l'evolution d'un personnage dans le temps.",
+            "desc_en": "Show character evolution over time.",
+            "usage": "!evolution <personnage>",
+            "aliases": "!evo, !history"
+        },
+        "compare": {
+            "desc_fr": "Compare un personnage entre tous les joueurs.",
+            "desc_en": "Compare a character across all players.",
+            "usage": "!compare <personnage>",
+            "aliases": "!cmp"
+        },
+        "builds": {
+            "desc_fr": "Liste les joueurs groupes par type de build.",
+            "desc_en": "List players grouped by build type.",
+            "usage": "!builds",
+            "aliases": "!profils"
+        },
     }
 
     if command_name is None:
@@ -263,21 +293,35 @@ async def custom_help(ctx, command_name: str = None):
         embed.add_field(
             name=t("help_cmd.general", lang),
             value=t("help_cmd.general_list", lang),
-            inline=False
+            inline=True
         )
 
         # Commandes inscription/profil
         embed.add_field(
             name=t("help_cmd.profile", lang),
             value=t("help_cmd.profile_list", lang),
-            inline=False
+            inline=True
+        )
+
+        # Stats joueurs
+        embed.add_field(
+            name=t("help_cmd.stats", lang),
+            value=t("help_cmd.stats_list", lang),
+            inline=True
+        )
+
+        # Communaute
+        embed.add_field(
+            name=t("help_cmd.community", lang),
+            value=t("help_cmd.community_list", lang),
+            inline=True
         )
 
         # Commandes Sages
         embed.add_field(
             name=t("help_cmd.sages", lang),
             value=t("help_cmd.sages_list", lang),
-            inline=False
+            inline=True
         )
 
         embed.set_footer(text=t("help_cmd.footer", lang))
