@@ -565,9 +565,14 @@ class SagesCog(commands.Cog):
         msg += f"* Charte : non validee\n"
         msg += f"* Joueurs supprimes : {deleted_count}\n"
         msg += f"* Role : Newbie\n"
-        msg += f"\nLe membre peut relancer `!inscription`."
+        msg += f"\nLancement automatique de l'inscription..."
 
         await ctx.send(msg)
+
+        # Lancer automatiquement l'inscription
+        registration_cog = self.bot.get_cog("RegistrationCog")
+        if registration_cog:
+            await registration_cog.start_registration(member)
 
         # Audit logging
         await log_action(
