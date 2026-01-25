@@ -135,6 +135,8 @@ class StatsCog(commands.Cog):
         self.check_completed_captures.start()
         # Lancer un check immediat au demarrage (apres que le bot soit pret)
         asyncio.create_task(self._initial_capture_check())
+        # Recalculer les builds manquants
+        asyncio.create_task(self._recalculate_missing_builds())
 
     async def cog_unload(self):
         """Arrete la tache de check des analyses."""
@@ -195,6 +197,49 @@ class StatsCog(commands.Cog):
         await asyncio.sleep(2)
         logger.info("Check initial des captures en attente...")
         await self.check_completed_captures()
+
+    async def _recalculate_missing_builds(self):
+        """Recalcule les builds pour les captures sans build_type."""
+        await self.bot.wait_until_ready()
+        await asyncio.sleep(3)  # Attendre apres le check initial
+
+        try:
+            async with self.bot.db_pool.acquire() as conn:
+                # Recuperer les stats sans build_type
+                rows = await conn.fetch("""
+                    SELECT id, agility, endurance, serve, volley, forehand, backhand
+                    FROM player_stats
+                    WHERE build_type IS NULL
+                """)
+
+                if not rows:
+                    return
+
+                logger.info(f"Recalcul des builds pour {len(rows)} capture(s)...")
+
+                updated = 0
+                for row in rows:
+                    stats = {
+                        'agility': row['agility'] or 0,
+                        'endurance': row['endurance'] or 0,
+                        'serve': row['serve'] or 0,
+                        'volley': row['volley'] or 0,
+                        'forehand': row['forehand'] or 0,
+                        'backhand': row['backhand'] or 0,
+                    }
+
+                    new_build = BuildTypes.calculate(stats)
+
+                    await conn.execute(
+                        "UPDATE player_stats SET build_type = $1 WHERE id = $2",
+                        new_build, row['id']
+                    )
+                    updated += 1
+
+                logger.info(f"Builds recalcules: {updated} capture(s) mises a jour")
+
+        except Exception as e:
+            logger.error(f"Erreur recalcul builds: {e}")
 
     async def _notify_capture_ready(self, user: discord.User, capture: CaptureQueue):
         """Notifie l'utilisateur qu'une capture a ete analysee et lui permet de valider.
@@ -907,6 +952,80 @@ class StatsCog(commands.Cog):
             embed.set_footer(text=f"... et {len(by_player) - 10} autre(s) joueur(s)")
 
         await reply_dm(ctx, embed=embed)
+
+    @commands.command(name="builds", aliases=["profils"])
+    async def list_builds(self, ctx):
+        """Affiche les joueurs groupes par type de build.
+
+        Usage: !builds
+        """
+        # Recuperer les stats groupees par build
+        builds_data = await PlayerStats.get_latest_by_build(self.bot.db_pool)
+
+        if not builds_data:
+            await reply_dm(ctx, "Aucune capture avec build detecte.")
+            return
+
+        # Trier les builds par nombre de joueurs decroissant
+        sorted_builds = sorted(builds_data.items(), key=lambda x: len(x[1]), reverse=True)
+
+        # Construire le message avec embeds
+        embeds = []
+        current_embed = discord.Embed(
+            title="Joueurs par type de build",
+            color=discord.Color.blue()
+        )
+        field_count = 0
+
+        for build_type, players in sorted_builds:
+            # Construire la liste des joueurs pour ce build
+            player_lines = []
+            for player_data in players:
+                player_name = player_data['player_name']
+                team_id = player_data['team_id']
+                stats = player_data['stats']
+
+                # Team 1 ou Team 2
+                team_label = f"Team {team_id}" if team_id else "?"
+
+                # Puissance globale
+                power = stats.global_power or "?"
+
+                # Top 2 stats
+                top_stats = stats.get_top_stats(2)
+                stats_str = " / ".join(f"{name}:{val}" for name, val in top_stats)
+
+                # Ligne formatee
+                player_lines.append(f"`{player_name:12}`  {team_label:8}  **{power}**  {stats_str}")
+
+            # Ajouter le field
+            value = "\n".join(player_lines[:10])  # Max 10 joueurs par build
+            if len(players) > 10:
+                value += f"\n... et {len(players) - 10} autre(s)"
+
+            # Discord limite a 25 fields par embed
+            if field_count >= 25:
+                embeds.append(current_embed)
+                current_embed = discord.Embed(
+                    title="Joueurs par type de build (suite)",
+                    color=discord.Color.blue()
+                )
+                field_count = 0
+
+            current_embed.add_field(
+                name=f"{build_type} ({len(players)})",
+                value=value,
+                inline=False
+            )
+            field_count += 1
+
+        # Ajouter le dernier embed
+        if field_count > 0:
+            embeds.append(current_embed)
+
+        # Envoyer les embeds
+        for embed in embeds:
+            await reply_dm(ctx, embed=embed)
 
     async def _get_user_lang(self, discord_id: int) -> str:
         """Recupere la langue preferee de l'utilisateur."""

@@ -417,11 +417,21 @@ async def start_player_registration(cog, member: discord.Member, dm_channel: dis
     await dm_channel.send(title)
     await asyncio.sleep(0.5)
 
-    # Team 1
-    await ask_players_for_team(cog, member, dm_channel, Teams.TEAM1_ID, Teams.TEAM1_NAME, lang, is_main_team=True)
+    # Team 1 (avec gestion d'erreur pour ne pas bloquer Team 2)
+    try:
+        await ask_players_for_team(cog, member, dm_channel, Teams.TEAM1_ID, Teams.TEAM1_NAME, lang, is_main_team=True)
+    except Exception as e:
+        logger.error(f"Erreur saisie Team 1 pour {username}: {e}")
+        error_msg = "Erreur lors de la saisie. Passons a la suite..." if lang.upper() == "FR" else "Error during input. Moving on..."
+        await dm_channel.send(error_msg)
 
     # Team 2
-    await ask_players_for_team(cog, member, dm_channel, Teams.TEAM2_ID, Teams.TEAM2_NAME, lang, is_main_team=False)
+    try:
+        await ask_players_for_team(cog, member, dm_channel, Teams.TEAM2_ID, Teams.TEAM2_NAME, lang, is_main_team=False)
+    except Exception as e:
+        logger.error(f"Erreur saisie Team 2 pour {username}: {e}")
+        error_msg = "Erreur lors de la saisie." if lang.upper() == "FR" else "Error during input."
+        await dm_channel.send(error_msg)
 
     # Resume
     players = await Player.get_by_member(cog.bot.db_pool, username)

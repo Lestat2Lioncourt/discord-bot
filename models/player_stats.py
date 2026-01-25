@@ -358,3 +358,95 @@ class PlayerStats:
             "Revers": str(self.backhand) if self.backhand else "-",
             "Build": self.build_type or "-",
         }
+
+    def get_top_stats(self, count: int = 2) -> list:
+        """Retourne les N stats les plus hautes avec leur nom et valeur.
+
+        Args:
+            count: Nombre de stats a retourner (defaut 2)
+
+        Returns:
+            Liste de tuples (nom_fr, valeur) triee par valeur decroissante
+        """
+        stat_names = {
+            "agility": "Agilite",
+            "endurance": "Endurance",
+            "serve": "Service",
+            "volley": "Volee",
+            "forehand": "Coup droit",
+            "backhand": "Revers",
+        }
+
+        stats = [
+            (stat_names["agility"], self.agility or 0),
+            (stat_names["endurance"], self.endurance or 0),
+            (stat_names["serve"], self.serve or 0),
+            (stat_names["volley"], self.volley or 0),
+            (stat_names["forehand"], self.forehand or 0),
+            (stat_names["backhand"], self.backhand or 0),
+        ]
+
+        # Trier par valeur decroissante
+        stats.sort(key=lambda x: x[1], reverse=True)
+        return stats[:count]
+
+    @classmethod
+    async def get_latest_by_build(cls, db_pool) -> dict:
+        """Recupere les dernieres stats de chaque joueur groupees par build.
+
+        Retourne uniquement la derniere capture de chaque joueur/personnage/build.
+
+        Args:
+            db_pool: Pool de connexions asyncpg
+
+        Returns:
+            Dict {build_type: [(player_name, team_id, PlayerStats), ...]}
+        """
+        query = """
+        WITH latest AS (
+            SELECT DISTINCT ON (player_id, character_name, build_type)
+                ps.*,
+                p.player_name,
+                p.team_id
+            FROM player_stats ps
+            JOIN players p ON ps.player_id = p.id
+            WHERE ps.build_type IS NOT NULL
+            ORDER BY player_id, character_name, build_type, captured_at DESC
+        )
+        SELECT * FROM latest
+        ORDER BY build_type, global_power DESC NULLS LAST
+        """
+
+        result = {}
+        async with db_pool.acquire() as conn:
+            rows = await conn.fetch(query)
+            for row in rows:
+                build = row['build_type']
+                if build not in result:
+                    result[build] = []
+
+                stats = cls(
+                    id=row['id'],
+                    discord_id=row['discord_id'],
+                    player_id=row['player_id'],
+                    character_name=row['character_name'],
+                    points=row['points'],
+                    global_power=row['global_power'],
+                    agility=row['agility'],
+                    endurance=row['endurance'],
+                    serve=row['serve'],
+                    volley=row['volley'],
+                    forehand=row['forehand'],
+                    backhand=row['backhand'],
+                    build_type=row['build_type'],
+                    comment=row['comment'],
+                    captured_at=row['captured_at']
+                )
+
+                result[build].append({
+                    'player_name': row['player_name'],
+                    'team_id': row['team_id'],
+                    'stats': stats
+                })
+
+        return result
