@@ -284,7 +284,6 @@ async def custom_help(ctx, command_name: str = None):
     if command_name is None:
         # Liste complete des commandes
         embed = discord.Embed(
-            title=t("help_cmd.title", lang),
             description=t("help_cmd.subtitle", lang),
             color=discord.Color.blue()
         )
@@ -293,35 +292,28 @@ async def custom_help(ctx, command_name: str = None):
         embed.add_field(
             name=t("help_cmd.general", lang),
             value=t("help_cmd.general_list", lang),
-            inline=True
+            inline=False
         )
 
-        # Commandes inscription/profil
+        # Commandes profil
         embed.add_field(
             name=t("help_cmd.profile", lang),
             value=t("help_cmd.profile_list", lang),
-            inline=True
+            inline=False
         )
 
         # Stats joueurs
         embed.add_field(
             name=t("help_cmd.stats", lang),
             value=t("help_cmd.stats_list", lang),
-            inline=True
-        )
-
-        # Communaute
-        embed.add_field(
-            name=t("help_cmd.community", lang),
-            value=t("help_cmd.community_list", lang),
-            inline=True
+            inline=False
         )
 
         # Commandes Sages
         embed.add_field(
             name=t("help_cmd.sages", lang),
             value=t("help_cmd.sages_list", lang),
-            inline=True
+            inline=False
         )
 
         embed.set_footer(text=t("help_cmd.footer", lang))
