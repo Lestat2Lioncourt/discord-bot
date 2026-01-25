@@ -988,6 +988,9 @@ class StatsCog(commands.Cog):
                 # Team 1 ou Team 2
                 team_label = f"Team {team_id}" if team_id else "?"
 
+                # Nom du personnage
+                char_name = stats.character_name or "?"
+
                 # Puissance globale
                 power = stats.global_power or "?"
 
@@ -996,7 +999,7 @@ class StatsCog(commands.Cog):
                 stats_str = " / ".join(f"{name}:{val}" for name, val in top_stats)
 
                 # Ligne formatee
-                player_lines.append(f"`{player_name:12}`  {team_label:8}  **{power}**  {stats_str}")
+                player_lines.append(f"`{player_name:12}`  {team_label:8}  {char_name:10}  **{power}**  {stats_str}")
 
             # Ajouter le field
             value = "\n".join(player_lines[:10])  # Max 10 joueurs par build
