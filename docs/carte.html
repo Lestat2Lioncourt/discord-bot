@@ -7,7 +7,7 @@
 
     <!-- Open Graph meta tags pour apercu Discord -->
     <meta property="og:title" content="This Is PSG - Carte des membres">
-    <meta property="og:description" content="6 membres localises - Carte de localisation des membres">
+    <meta property="og:description" content="7 membres localises - Carte de localisation des membres">
     <meta property="og:type" content="website">
     <meta property="og:image" content="https://i.imgur.com/YourLogoHere.png">
     <meta name="theme-color" content="#004170">
@@ -55,7 +55,7 @@
 <body>
     <div id="header">
         <h1>This Is PSG - Carte des membres</h1>
-        <div class="stats">6 membres localises | Genere le 25/01/2026 09:15</div>
+        <div class="stats">7 membres localises | Genere le 30/01/2026 23:41</div>
     </div>
     <div id="map"></div>
 
@@ -63,7 +63,7 @@
     <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
     <script>
         // Donnees des membres (injectees par le bot)
-        const members = [{"name": "DeTraX", "lat": 48.8428308, "lng": 2.4024948, "team1": ["DeTraX"], "team2": ["Lestat"]}, {"name": "Nico", "lat": 46.603354, "lng": 1.8883335, "team1": ["Armada"], "team2": []}, {"name": "Blusky", "lat": 48.8392676, "lng": 2.1575981, "team1": ["Kaioken"], "team2": []}, {"name": "MisterKara", "lat": 48.751126, "lng": 2.2534015, "team1": ["MisterKara"], "team2": []}, {"name": "krens", "lat": 48.9274192, "lng": 2.0426301, "team1": ["Krens971"], "team2": []}, {"name": "Lestat", "lat": 48.8588897, "lng": 2.320041, "team1": ["Aaa"], "team2": ["Bbb"]}];
+        const members = [{"name": "Nico", "lat": 46.603354, "lng": 1.8883335, "team1": ["Armada"], "team2": []}, {"name": "DeTraX", "lat": 48.8428308, "lng": 2.4024948, "team1": ["DeTraX"], "team2": ["Lestat"]}, {"name": "Blusky", "lat": 48.8392676, "lng": 2.1575981, "team1": ["Kaioken"], "team2": []}, {"name": "krens", "lat": 48.9274192, "lng": 2.0426301, "team1": ["Krens971"], "team2": []}, {"name": "LynxEye", "lat": 61.0666922, "lng": -107.991707, "team1": [], "team2": ["LynxEye"]}, {"name": "MisterKara", "lat": 48.751126, "lng": 2.2534015, "team1": ["MisterKara"], "team2": []}, {"name": "Lestat", "lat": 48.8588897, "lng": 2.320041, "team1": ["Aaa"], "team2": ["Bbb"]}];
 
         // Initialiser la carte centree sur la France
         const map = L.map('map').setView([46.603354, 1.888334], 5);
