@@ -538,28 +538,19 @@ class SagesCog(commands.Cog):
 
         username = member.name
 
-        # Charger le profil : tentative par discord_id, puis fallback par discord_name
-        # (evite la resync qui peut violer la contrainte UNIQUE sur discord_name)
+        # Charger le profil par discord_id. Pas de fallback par discord_name :
+        # un homonyme pourrait faire qu'on reset le mauvais profil.
         async with self.bot.db_pool.acquire() as conn:
             profile = await UserProfile.get_by_discord_id(conn, member.id)
-
-            if not profile:
-                # Fallback : chercher par discord_name (display_name Discord)
-                row = await conn.fetchrow(
-                    "SELECT discord_id FROM user_profile WHERE discord_name = $1",
-                    member.display_name
-                )
-                if row:
-                    profile = await UserProfile.get_by_discord_id(conn, row['discord_id'])
 
             if not profile:
                 await ctx.send(
                     f"**Profil introuvable pour {member.display_name}**\n"
                     f"- Discord ID : `{member.id}`\n"
-                    f"- Username : `{member.name}`\n"
-                    f"- Display name : `{member.display_name}`\n\n"
-                    f"Aucun profil en DB avec ce discord_id ni ce discord_name. "
-                    f"Peut-etre un homonyme ou un membre non inscrit."
+                    f"- Username : `{member.name}`\n\n"
+                    f"Ce membre n'a pas encore de profil en DB. "
+                    f"Pour reinitialiser un profil orphelin (membre parti du serveur), "
+                    f"utilise `!delete` avec le discord_id ou demande une intervention manuelle."
                 )
                 return
 
