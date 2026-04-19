@@ -524,9 +524,8 @@ class SagesCog(commands.Cog):
     # =========================================================================
     @commands.command(name="reset")
     @sage_only()
-    @debug_only()
     async def cmd_reset(self, ctx, *, search: str = None):
-        """Reinitialise un membre pour permettre une nouvelle inscription (debug)."""
+        """Reinitialise un membre pour permettre une nouvelle inscription."""
         if not search:
             await ctx.send("**Usage:** `!reset <nom>` (ex: `!reset detrax`)")
             return
