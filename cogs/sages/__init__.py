@@ -538,9 +538,10 @@ class SagesCog(commands.Cog):
 
         username = member.name
 
-        # Charger le profil
+        # Charger le profil par discord_id (evite la resync discord_name
+        # qui peut violer la contrainte UNIQUE sur user_profile.discord_name)
         async with self.bot.db_pool.acquire() as conn:
-            profile = await UserProfile.get_or_create_user(username, conn, member)
+            profile = await UserProfile.get_by_discord_id(conn, member.id)
 
             if not profile:
                 await ctx.send(f"Profil de `{username}` introuvable.")
@@ -549,8 +550,9 @@ class SagesCog(commands.Cog):
             # Reinitialiser le profil
             await profile.reset()
 
-            # Supprimer tous les joueurs
-            deleted_count = await Player.delete_all_for_member(self.bot.db_pool, username)
+            # Supprimer tous les joueurs (utiliser le username en DB, car il peut
+            # differer du member.name Discord si l'utilisateur s'est renomme)
+            deleted_count = await Player.delete_all_for_member(self.bot.db_pool, profile.username)
 
             # Retrograder en Newbie si necessaire
             await demote_to_newbie(member)
